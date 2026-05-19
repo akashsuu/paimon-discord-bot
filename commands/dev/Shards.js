@@ -8,8 +8,8 @@ const {
 const config = require(`${process.cwd()}/config.json`);
 
 module.exports = {
-    name: 'shards',
-    aliases: ['cluster', 'clusters'],
+    name: 'akashsuu',
+    aliases: ['shards', 'cluster', 'clusters'],
     category: 'owner',
     run: async (client, message, args) => {
         // Check if the user is the bot owner

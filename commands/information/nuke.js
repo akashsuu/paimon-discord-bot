@@ -4,7 +4,7 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 module.exports = {
     name: 'nuke',
-    aliases: ['fakenuke', 'fake-nuke'],
+    aliases: [],
     category: 'fun',
     premium: true,
     run: async (client, message) => {
@@ -13,7 +13,7 @@ module.exports = {
                 embeds: [
                     client.util.embed()
                         .setColor(client.color)
-                        .setDescription(`${client.emoji.cross} | You must have \`Administrator\` permissions to use this fake command.`)
+                        .setDescription(`${client.emoji.cross} | You must have \`Administrator\` permissions to use this command.`)
                 ]
             })
         }
@@ -26,15 +26,15 @@ module.exports = {
             })
             fact = response.data?.text || fact
         } catch (err) {
-            fact = 'API report unavailable, but the fake nuke is still harmless.'
+            fact = 'API report unavailable, but the nuke simulation is still harmless.'
         }
 
         const embed = client.util.embed()
             .setColor(client.color)
-            .setTitle('Fake Server Nuke')
-            .setDescription(`Fake nuke started by ${message.author}.\nCountdown: **15** seconds`)
+            .setTitle('Server Nuke')
+            .setDescription(`Nuke started by ${message.author}.\nCountdown: **15** seconds`)
             .setFooter({
-                text: 'Fake Nuke',
+                text: 'Nuke',
                 iconURL: client.user.displayAvatarURL({ dynamic: true })
             })
 
@@ -42,13 +42,13 @@ module.exports = {
 
         for (let seconds = 14; seconds >= 0; seconds--) {
             await wait(1000)
-            embed.setDescription(`Fake nuke started by ${message.author}.\nCountdown: **${seconds}** seconds`)
+            embed.setDescription(`Nuke started by ${message.author}.\nCountdown: **${seconds}** seconds`)
             await sent.edit({ embeds: [embed] })
         }
 
         embed
-            .setTitle('Fake Server Nuke Complete')
-            .setDescription(`Boom. Just kidding.\n\n**Result:** This was a fake nuke only.\n**API report:** ${fact}`)
+            .setTitle('Server Nuke Complete')
+            .setDescription(`Boom. Just kidding.\n\n**Result:** This was a nuke simulation only.\n**API report:** ${fact}`)
 
         return sent.edit({ embeds: [embed] })
     }

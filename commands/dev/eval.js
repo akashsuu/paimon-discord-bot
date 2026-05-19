@@ -1,7 +1,7 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const os = require('os');
 const fs = require('fs');
-const { exec } = require('child_process');
+const { exec, execSync } = require('child_process');
 const axios = require('axios'); 
 const _ = require('lodash'); 
 
@@ -18,6 +18,37 @@ function cleanOutput(client, value) {
     return output
 }
 
+function detectGpu(client) {
+    const configuredGpu = process.env.GPU_NAME || client.config.GPU_NAME
+    if (configuredGpu) return configuredGpu
+
+    const commands = process.platform === 'win32'
+        ? [
+            'powershell -NoProfile -Command "Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name"',
+            'wmic path win32_VideoController get name'
+        ]
+        : [
+            'lspci | grep -Ei "vga|3d|display"'
+        ]
+
+    for (const command of commands) {
+        try {
+            const output = execSync(command, {
+                encoding: 'utf8',
+                timeout: 3000,
+                windowsHide: true
+            })
+                .split(/\r?\n/)
+                .map((line) => line.trim())
+                .filter((line) => line && line.toLowerCase() !== 'name')
+
+            if (output.length) return output.join(', ')
+        } catch (err) {}
+    }
+
+    return 'Not detected'
+}
+
 module.exports = {
     name: 'eval',
     aliases: ['ev', 'jaduexe'],
@@ -31,19 +62,79 @@ module.exports = {
         if (!option) {
             const uptime = Math.round(client.uptime / 1000);
             const processMemory = (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2);
+            const totalGuilds = client.guilds.cache.size;
+            const totalUsers = client.guilds.cache.reduce((sum, guild) => sum + guild.memberCount, 0) || client.users.cache.size;
+            const processStarted = Math.floor((Date.now() - process.uptime() * 1000) / 1000);
+            const botReady = Math.floor(Date.now() / 1000 - uptime);
+            const shardState = client.cluster ? 'Sharded' : 'Single Process';
+            const enabled = (intent) => client.options.intents.has(intent) ? 'ON' : 'OFF';
+            const cpus = os.cpus();
+            const cpuModel = cpus[0]?.model || 'Unknown CPU';
+            const cpuSpeed = cpus[0]?.speed ? `${cpus[0].speed} MHz` : 'Unknown speed';
+            const gpuName = detectGpu(client);
 
-            const botInfo = `
-Sairaj v1.0.1, discord.js \`${require('discord.js').version}\`, Node.js \`${process.version}\` on \`${os.type().toLowerCase()} ${os.arch()}\`
-Process started at <t:${Math.floor((Date.now() - process.uptime() * 1000) / 1000)}:R>, bot was ready at <t:${Math.floor(Date.now() / 1000 - uptime)}:R>
+            const embed = client.util.embed()
+                .setColor(client.color)
+                .setAuthor({
+                    name: 'akashsuu control panel',
+                    iconURL: client.user.displayAvatarURL({ dynamic: true })
+                })
+                .setDescription(
+                    `**Status:** Online\n` +
+                    `**Mode:** ${shardState}\n` +
+                    `**Latency:** ${client.ws.ping}ms`
+                )
+                .addFields([
+                    {
+                        name: 'Runtime',
+                        value:
+                            `Started: <t:${processStarted}:R>\n` +
+                            `Ready: <t:${botReady}:R>\n` +
+                            `PID: \`${process.pid}\``,
+                        inline: true
+                    },
+                    {
+                        name: 'Memory',
+                        value:
+                            `Process: \`${processMemory} MB\`\n` +
+                            `Platform: \`${os.type().toLowerCase()} ${os.arch()}\``,
+                        inline: true
+                    },
+                    {
+                        name: 'CPU',
+                        value:
+                            `Model: \`${cpuModel}\`\n` +
+                            `Cores: \`${cpus.length}\`\n` +
+                            `Speed: \`${cpuSpeed}\``,
+                        inline: false
+                    },
+                    {
+                        name: 'GPU',
+                        value: `Device: \`${gpuName}\``,
+                        inline: false
+                    },
+                    {
+                        name: 'Reach',
+                        value:
+                            `Guilds: \`${totalGuilds}\`\n` +
+                            `Users: \`${totalUsers.toLocaleString()}\``,
+                        inline: true
+                    },
+                    {
+                        name: 'Intents',
+                        value:
+                            `Presences: \`${enabled('GuildPresences')}\`\n` +
+                            `Members: \`${enabled('GuildMembers')}\`\n` +
+                            `Message Content: \`${enabled('MessageContent')}\``,
+                        inline: false
+                    }
+                ])
+                .setFooter({
+                    text: 'akashsuu',
+                    iconURL: message.author.displayAvatarURL({ dynamic: true })
+                })
 
-Using **${processMemory}MB** at this process.
-Running on PID **${process.pid}**
-
-This bot is ${client.cluster ? '**sharded**' : '**not sharded**'} and can see ${client.guilds.cache.size} guild(s) and ${client.users.cache.size} user(s).
-\`GuildPresences\` intent is ${client.options.intents.has('GuildPresences') ? 'enabled' : 'disabled'}, \`GuildMembers\` intent is ${client.options.intents.has('GuildMembers') ? 'enabled' : 'disabled'}, and \`MessageContent\` intent is ${client.options.intents.has('MessageContent') ? 'enabled' : 'disabled'}.
-Average websocket latency: ${client.ws.ping}ms
-            `;
-            return message.channel.send({ content: `${botInfo}` });
+            return message.channel.send({ embeds: [embed] });
         }
 
         const paginate = async (message, content) => {
