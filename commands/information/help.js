@@ -8,6 +8,10 @@ module.exports = {
     premium: true,
     run: async (client, message, args) => {
         let prefix = message.guild?.prefix || client.config.PREFIX; // Default prefix if not set
+        const menuOption = (option) => ({
+            ...option,
+            emoji: client.util.componentEmoji(option.emoji)
+        })
 
         const row1 = new ActionRowBuilder().addComponents(
             new StringSelectMenuBuilder()
@@ -18,45 +22,51 @@ module.exports = {
                         label: 'AntiNuke',
                         description: 'Get All AntiNuke Command List',
                         value: 'antinuke',
-                        emoji: `${client.emoji.antinuke}`
+                        emoji: client.emoji.antinuke
                     },
                     {
                         label: 'Moderation',
                         description: 'Get All Moderation Command List',
                         value: 'moderation',
-                        emoji: `${client.emoji.mod}`
+                        emoji: client.emoji.mod
                     },
                     {
                         label: 'Automod',
                         description: 'Get All Automod Command List',
                         value: 'automod',
-                        emoji: `${client.emoji.automod}`
+                        emoji: client.emoji.automod
                     },
                     {
                         label: 'Logger',
                         description: 'Get All Logger Command List',
                         value: 'logger',
-                        emoji: `${client.emoji.logs}`
+                        emoji: client.emoji.logs
                     },
                     {
                         label: 'Utility',
                         description: 'Get All Utility Command List',
                         value: 'utility',
-                        emoji: `${client.emoji.utillity}`
+                        emoji: client.emoji.utillity
                     },
                     {
                         label: 'Server Utility',
                         description: 'Get All Server Utility Command List',
                         value: 'serverutility',
-                        emoji: `${client.emoji.serverutillity}`
+                        emoji: client.emoji.serverutillity
                     },
                     {
                         label: 'Auto Responder',
                         description: 'Get All Auto Responder Command List',
                         value: 'autoresponder',
-                        emoji: `${client.emoji.autoresponder}`
+                        emoji: client.emoji.autoresponder
+                    },
+                    {
+                        label: 'Fun',
+                        description: 'Get All Fun Command List',
+                        value: 'fun',
+                        emoji: client.emoji.fun
                     }
-                ])
+                ].map(menuOption))
         );
 
         const row2 = new ActionRowBuilder().addComponents(
@@ -68,45 +78,45 @@ module.exports = {
                         label: 'Verification',
                         description: 'Get All Verification Command List',
                         value: 'verification',
-                        emoji: `${client.emoji.verification}`
+                        emoji: client.emoji.verification
                     },
                     {
                         label: 'Join To Create',
                         description: 'Get All Join To Create Command List',
                         value: 'jointocreate',
-                        emoji: `${client.emoji.jtc}`
+                        emoji: client.emoji.jtc
                     },
                     {
                         label: 'Voice',
                         description: 'Get All Voice Command List',
                         value: 'voice',
-                        emoji: `${client.emoji.vc}`
+                        emoji: client.emoji.vc
                     },
                     {
                         label: 'Custom Role',
                         description: 'Get All Custom Role Command List',
                         value: 'customrole',
-                        emoji: `${client.emoji.customrole}`
+                        emoji: client.emoji.customrole
                     },
                     {
                         label: 'Welcomer',
                         description: 'Get All Welcomer Command List',
                         value: 'welcomer',
-                        emoji: `${client.emoji.welcome}`
+                        emoji: client.emoji.welcome
                     },
                     {
                         label: 'Sticky',
                         description: 'Get All Sticky Command List',
                         value: 'sticky',
-                        emoji: `${client.emoji.sticky}`
+                        emoji: client.emoji.sticky
                     },
                     {
                     label : 'Ticket',
                     description : 'Get All Ticket Command List',
                     value : 'ticket',
-                    emoji : `${client.emoji.ticket}`
+                    emoji : client.emoji.ticket
                     },
-                ])
+                ].map(menuOption))
         );
 
         const categories = {
@@ -117,7 +127,8 @@ module.exports = {
                 `**${client.emoji.logs} \`:\` Logger**`,
                 `**${client.emoji.utillity} \`:\` Utility**`,
                 `**${client.emoji.serverutillity} \`:\` Server Utility**`,
-                `**${client.emoji.autoresponder} \`:\` Auto Responder**`
+                `**${client.emoji.autoresponder} \`:\` Auto Responder**`,
+                `**${client.emoji.fun} \`:\` Fun**`
 
             ],
             category2: [

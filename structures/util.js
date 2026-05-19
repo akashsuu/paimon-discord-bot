@@ -512,6 +512,32 @@ module.exports = class Util {
                     .catch((_) => _)
                 return
             }
+            if (funny === 'fun') {
+                let cmdList = [];
+                interaction.client.commands
+                .filter((cmd) => cmd.category === 'fun')
+                .forEach((cmd) => {
+                    if (cmd.subcommand && cmd.subcommand.length) {
+                        cmdList.push(`\`${cmd.name}\``);
+                        cmd.subcommand.forEach((subCmd) => {
+                            cmdList.push(`\`${cmd.name} ${subCmd}\``);
+                        });
+                    } else {
+                        cmdList.push(`\`${cmd.name}\``);
+                    }
+                })
+                embed.addFields({
+                   name : `**${interaction.client.emoji.fun} Fun \`[${cmdList.length}]\`**`,
+                  value :  cmdList.sort().join(', ') || 'No fun commands found.'
+            })
+                interaction
+                    .reply({
+                        embeds: [embed],
+                        ephemeral: true
+                    })
+                    .catch((_) => {})
+                return
+            }
             if (funny === 'verification') {
                 let cmdList = [];
                 interaction.client.commands
@@ -878,6 +904,24 @@ module.exports = class Util {
     embed() {
 		return new EmbedBuilder().setColor(this.client.color)
 	}
+
+    componentEmoji(emoji) {
+        if (typeof emoji !== 'string') return emoji
+
+        const custom = emoji.match(/^<(?<animated>a?):(?<name>[^:>]+):(?<id>\d{15,25})>$/)
+        if (custom?.groups) {
+            return {
+                id: custom.groups.id,
+                name: custom.groups.name,
+                animated: custom.groups.animated === 'a'
+            }
+        }
+
+        const rawId = emoji.match(/^\d{15,25}$/)
+        if (rawId) return { id: emoji }
+
+        return { name: emoji }
+    }
 
        async AkashsuuPagination(membersList, title, client, message) {
     const lodash = require('lodash');

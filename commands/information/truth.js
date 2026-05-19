@@ -2,7 +2,7 @@ const { MessageEmbed, ButtonBuilder, ActionRowBuilder } = require("discord.js");
 const axios = require("axios")
 module.exports = {
     name: 'truth',
-    category: 'info',
+    category: 'fun',
     premium: true,
     run: async (client, message, args) => {
     try {

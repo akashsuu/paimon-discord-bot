@@ -4,7 +4,7 @@ const canvafy = require('canvafy');
 module.exports = {
     name: 'ship',
     aliases: ['shiprandom'],
-    category: 'info',
+    category: 'fun',
     cooldown: 8,
     premium: true,
 

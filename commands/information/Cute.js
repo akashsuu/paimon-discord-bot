@@ -119,7 +119,7 @@ async function getUserFromMention(message, mention) {
 module.exports = {
     name: 'cute',
     aliases: ['cuteness'],
-    category: 'info',
+    category: 'fun',
     premium: true,
     run: async (client, message, args) => {
         let user = await getUserFromMention(message, args[0]);

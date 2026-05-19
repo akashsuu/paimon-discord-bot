@@ -5,7 +5,7 @@ const cooldown = new Set();
 
 module.exports = {
     name: 'reaction',
-    category: 'info',
+    category: 'fun',
     premium: true,
 
     run: async (client, message, args) => {

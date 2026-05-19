@@ -12,6 +12,22 @@ const pg = require('pg')
 const redis = require("redis");
 const { ClusterClient, getInfo } = require('discord-hybrid-sharding');
 const Sql = require('better-sqlite3')
+
+function normalizeEmoji(value) {
+    if (typeof value !== 'string') return value
+
+    const rawId = value.match(/^\d{15,25}$/)
+    if (rawId) return `<:emoji_${value}:${value}>`
+
+    const missingName = value.match(/^<(?<animated>a?):(?<id>\d{15,25})>$/)
+    if (missingName?.groups) {
+        const prefix = missingName.groups.animated ? '<a:' : '<:'
+        return `${prefix}emoji_${missingName.groups.id}:${missingName.groups.id}>`
+    }
+
+    return value
+}
+
 module.exports = class Akashsuu extends Client {
     constructor() {
         super({
@@ -42,7 +58,12 @@ module.exports = class Akashsuu extends Client {
         this.config = require(`${process.cwd()}/config.json`)
         this.config.TOKEN = process.env.TOKEN || this.config.TOKEN
         this.config.MONGO_DB = process.env.MONGO_DB || this.config.MONGO_DB
-        this.emoji = require(`${process.cwd()}/emoji.json`)
+        this.emoji = Object.fromEntries(
+            Object.entries(require(`${process.cwd()}/emoji.json`)).map(([key, value]) => [
+                key,
+                normalizeEmoji(value)
+            ])
+        )
         this.logger = require('./logger')
         this.commands = new Collection()
         this.categories = fs.readdirSync('./commands/')
