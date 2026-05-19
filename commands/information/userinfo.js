@@ -49,8 +49,6 @@ module.exports = {
             
            if(me.user.id === message.guild.ownerId) {
                keys = 'Server Owner';
-           } else if(me.user.id === '879209290664128542') {
-       keys = 'akashsuu Premium | Daddy';        
            } else if(client.config.owner.includes(me.user.id)) {
              keys = 'akashsuu Developer';  
            } else if (f.includes('Administrator')) {

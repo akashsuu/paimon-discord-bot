@@ -39,13 +39,16 @@ module.exports = {
 
         // Adding shard information to the embed
         shardInfo.forEach(shard => {
-            embed.addField(`Cluster [${shard.id}]`,
-                `**Latency:** ${shard.latency}ms\n` +
-                `**Uptime:** <t:${Math.floor(shard.uptime / 1000)}:R>\n` +
-                `**RAM:** ${Math.round(shard.ram)} MB\n` +
-                `**CPU:** ${shard.cpu.toFixed(2)}%\n` +
-                `**Servers:** ${shard.servers}\n` +
-                `**Members:** ${shard.members.toLocaleString()}`);
+            embed.addFields({
+                name: `Cluster [${shard.id}]`,
+                value:
+                    `**Latency:** ${shard.latency}ms\n` +
+                    `**Uptime:** <t:${Math.floor(shard.uptime / 1000)}:R>\n` +
+                    `**RAM:** ${Math.round(shard.ram)} MB\n` +
+                    `**CPU:** ${shard.cpu.toFixed(2)}%\n` +
+                    `**Servers:** ${shard.servers}\n` +
+                    `**Members:** ${shard.members.toLocaleString()}`
+            });
         });
 
         // Sending the embed to the channel

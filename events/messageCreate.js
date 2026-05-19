@@ -472,7 +472,7 @@ module.exports = async (client) => {
             const ignore = (await client.db?.get(
                 `ignore_${message.guild.id}`
             )) ?? { channel: [], role: [] }
-            if (!'1143155471159664710'.includes(message.author.id) &&
+            if (!client.config.owner.includes(message.author.id) &&
                 ignore.channel.includes(message.channel.id) &&
                 !message.member.roles.cache.some((role) =>
                     ignore.role.includes(role.id)

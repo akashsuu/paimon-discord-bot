@@ -1,8 +1,23 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const os = require('os');
 const fs = require('fs');
+const { exec } = require('child_process');
 const axios = require('axios'); 
 const _ = require('lodash'); 
+
+function cleanOutput(client, value) {
+    let output = typeof value === 'string'
+        ? value
+        : require('util').inspect(value, { depth: 1 })
+
+    const secrets = [client.token, client.config.TOKEN, client.config.MONGO_DB].filter(Boolean)
+    for (const secret of secrets) {
+        output = output.replaceAll(secret, 'T0K3N')
+    }
+
+    return output
+}
+
 module.exports = {
     name: 'eval',
     aliases: ['ev', 'jaduexe'],
@@ -10,7 +25,7 @@ module.exports = {
     run: async (client, message, args) => {
         if (!client.config.owner.includes(message.author.id)) return;
 
-        const option = args[0];
+        const option = args[0]?.toLowerCase();
         const content = args.slice(1).join(' ');
 
         if (!option) {
@@ -104,7 +119,6 @@ Average websocket latency: ${client.ws.ping}ms
             switch (option) {
                 case 'js':
                     output = await eval(content);
-                    output = require('util').inspect(output, { depth: 0 });
                     break;
                 case 'exec':
                     output = await new Promise((resolve, reject) => {
@@ -119,19 +133,17 @@ Average websocket latency: ${client.ws.ping}ms
                     break;
                 case 'curl':
                     const response = await axios.get(content);
-                    output = require('util').inspect(response.data, { depth: 1 });
+                    output = response.data;
                     break;
                 default:
                     output = `Invalid option. Available options: \`js\`, \`exec\`, \`cat\`, \`curl\``;
             }
 
-            output = output.replaceAll(client.token, 'T0K3N')
-                .replaceAll(client.config.MONGO_DB, 'T0K3N');
-            await paginate(message, output);
+            await paginate(message, cleanOutput(client, output));
         } catch (err) {
             const errorEmbed = new EmbedBuilder()
                 .setColor(client.color)
-                .setDescription(`\`\`\`js\n${err.toString().replaceAll(client.token, 'T0K3N').replaceAll(this.config.MONGO_DB, 'T0K3N')}\`\`\``);
+                .setDescription(`\`\`\`js\n${cleanOutput(client, err.stack || err.toString())}\`\`\``);
 
             message.channel.send({ embeds: [errorEmbed] });
         }

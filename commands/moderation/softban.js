@@ -1,5 +1,4 @@
 const { Message, Client, MessageEmbed } = require('discord.js')
-const saixd = ['1143155471159664710']
 module.exports = {
     name: 'softban',
     aliases: [],
@@ -13,7 +12,7 @@ module.exports = {
      * @param {String[]} args
      */
     run: async (client, message, args) => {
-        if (!saixd.includes(message.author.id) && !message.member.permissions.has('BanMembers')) {
+        if (!client.config.owner.includes(message.author.id) && !message.member.permissions.has('BanMembers')) {
             return message.channel.send({
                 embeds: [
                     client.util.embed()
@@ -80,7 +79,7 @@ module.exports = {
                         )
                 ]
             })
-        if (!saixd.includes(message.author.id) && !client.util.hasHigher(message.member)) {
+        if (!client.config.owner.includes(message.author.id) && !client.util.hasHigher(message.member)) {
             return message.channel.send({
                 embeds: [
                     client.util.embed()

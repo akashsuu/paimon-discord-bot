@@ -8,7 +8,7 @@ module.exports = {
     aliases: [],
     category: 'owner',
     run: async (client, message, args) => {
-    if (!saixd.includes(message.author.id)) return
+    if (!client.config.owner.includes(message.author.id)) return
 let userId = await getUserFromMention(message, args[0]);
 if (!userId) {
     try {

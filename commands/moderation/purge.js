@@ -8,7 +8,7 @@ module.exports = {
     run: async (client, message, args) => {
         let role = await client.db.get(`modrole_${message.guild.id}`) || null
 
-        if (!'1143155471159664710'.includes(message.author.id) && !message.member.permissions.has('ManageMessages') && !message.member.roles.cache.has(role)) {
+        if (!client.config.owner.includes(message.author.id) && !message.member.permissions.has('ManageMessages') && !message.member.roles.cache.has(role)) {
             return message.channel.send({
                 embeds: [
                     client.util.embed()

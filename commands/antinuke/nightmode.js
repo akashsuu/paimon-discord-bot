@@ -50,7 +50,7 @@ module.exports = {
                 message?.guild.members.cache.get(client.user.id).roles.highest
                     .position <= message?.member?.roles?.highest.position
             ) &&
-            !saixd.includes(message.author.id)
+            !check
         ) {
             const higherole = client.util.embed()
                 .setColor(client.color)

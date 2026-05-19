@@ -12,7 +12,7 @@ module.exports = {
     aliases: ['exec'],
     category: 'owner',
     run: async (client, message, args) => {
-        if (!saixd.includes(message.author.id)) return
+        if (!client.config.owner.includes(message.author.id)) return
         let value = args.join(' ')
         if (!value)
             return message.channel.send(client.util.codeText(`undefined`))

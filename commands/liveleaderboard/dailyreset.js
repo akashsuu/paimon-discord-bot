@@ -6,7 +6,7 @@ module.exports = {
     premium: true,
     subcommand: ['messages', 'voices', 'all'],
     run: async (client, message, args) => {
-        if (!'1143155471159664710'.includes(message.author.id) && !message.member.permissions.has('Administrator')) {
+        if (!client.config.owner.includes(message.author.id) && !message.member.permissions.has('Administrator')) {
             return message.channel.send({
                 embeds: [
                     client.util.embed()
@@ -26,7 +26,7 @@ module.exports = {
             });
         }
 
-        if (!'1143155471159664710'.includes(message.author.id) && !client.util.hasHigher(message.member)) {
+        if (!client.config.owner.includes(message.author.id) && !client.util.hasHigher(message.member)) {
             return message.channel.send({
                 embeds: [
                     client.util.embed()

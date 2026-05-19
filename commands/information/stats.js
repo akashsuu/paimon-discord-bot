@@ -10,6 +10,13 @@ module.exports = {
     premium: false,
 
     run: async (client, message, args) => {
+        const ownerId = client.config.owner?.[0] || client.user.id;
+        const ownerUser = await client.users.fetch(ownerId).catch(() => client.user);
+        const botAuthor = {
+            name: ownerUser.globalName || ownerUser.username || client.user.username,
+            iconURL: ownerUser.displayAvatarURL({ dynamic: true })
+        };
+
         // Buttons for various information
         let button = new ButtonBuilder()
             .setLabel('Team Info')
@@ -42,10 +49,7 @@ module.exports = {
         const embed = client.util.embed()
             .setColor(client.color)
             .setTitle(`These statistics are only for cluster ${client.cluster.id} not for the entire bot.`)
-            .setAuthor({
-                name: client.users.cache.get('1426248994857680946').globalName,
-                iconURL: client.users?.cache?.get('1426248994857680946')?.displayAvatarURL({ dynamic: true })
-            })
+            .setAuthor(botAuthor)
             .setDescription(
                 `**__General Informations__**\nBot's Mention: <@!${client.user.id}>\nBot's Tag: ${client.user.tag}\nCluster: ${client.cluster.id}\nShard: ${message.guild.shardId}\nBot's Version: 4.0.0\nTotal Servers: ${guilds1}\nTotal Users: ${member1} (${client.users.cache.size} Cached)\nTotal Channels: ${client.channels.cache.size}\nLast Rebooted: ${moment(uptime).fromNow()}`
             )
@@ -95,8 +99,7 @@ module.exports = {
                     i.deferUpdate();
 
                     let dev = []
-                    let user = await client.users.fetch('1426248994857680946'); //terminator
-                    dev.push(`[${user.username}](https://discord.com/users/1426248994857680946)`);
+                    dev.push(`[${ownerUser.username}](https://discord.com/users/${ownerUser.id})`);
               
 
                     const em = client.util.embed()
@@ -131,10 +134,7 @@ module.exports = {
                     const embed = client.util.embed()
                         .setColor(client.color)
                         .setTitle(`These statistics are only for cluster ${client.cluster.id} not for the entire bot.`)
-                        .setAuthor({
-                            name: client.users.cache.get('1426248994857680946').globalName,
-                            iconURL: client.users?.cache?.get('1426248994857680946')?.displayAvatarURL({ dynamic: true })
-                        })
+                        .setAuthor(botAuthor)
                         .setDescription(
                             `**__General Informations__**\nBot's Mention: <@!${client.user.id}>\nBot's Tag: ${client.user.tag}\nCluster: ${client.cluster.id}\nShard: ${message.guild.shardId}\nBot's Version: 4.0.0\nTotal Servers: ${guilds}\nTotal Users: ${member1} (${client.users.cache.size} Cached)\nTotal Channels: ${client.channels.cache.size}`
                         )
@@ -163,10 +163,7 @@ module.exports = {
                             embeds: [
                                 client.util.embed()
                                     .setColor(client.color)
-                                    .setAuthor({
-                                        name: client.users.cache.get('1426248994857680946').globalName,
-                                        iconURL: client.users?.cache?.get('1426248994857680946')?.displayAvatarURL({ dynamic: true })
-                                    })
+                                    .setAuthor(botAuthor)
                                     .setFooter({
                                         text: `Requested By ${message.author.tag}`,
                                         iconURL:
@@ -248,10 +245,7 @@ module.exports = {
                         const ping = await client?.db?.ping()
                         const embed1 = client.util.embed()
                             .setColor(client.color)
-                            .setAuthor({
-                                name: client.users.cache.get('1426248994857680946').globalName,
-                                iconURL: client.users?.cache?.get('1426248994857680946')?.displayAvatarURL({ dynamic: true })
-                            })
+                            .setAuthor(botAuthor)
                             .setDescription(
                                 `**__System Informations__**\nSystem Latency: ${
                                     client.ws.ping
