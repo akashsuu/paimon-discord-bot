@@ -526,10 +526,31 @@ module.exports = class Util {
                         cmdList.push(`\`${cmd.name}\``);
                     }
                 })
-                embed.addFields({
-                   name : `**${interaction.client.emoji.fun} Fun \`[${cmdList.length}]\`**`,
-                  value :  cmdList.sort().join(', ') || 'No fun commands found.'
-            })
+                const sortedCommands = cmdList.sort()
+                const chunks = []
+                let chunk = ''
+
+                for (const command of sortedCommands) {
+                    const next = chunk ? `${chunk}, ${command}` : command
+                    if (next.length > 950) {
+                        chunks.push(chunk)
+                        chunk = command
+                    } else {
+                        chunk = next
+                    }
+                }
+
+                if (chunk) chunks.push(chunk)
+                if (!chunks.length) chunks.push('No fun commands found.')
+
+                chunks.forEach((commands, index) => {
+                    embed.addFields({
+                        name: index === 0
+                            ? `**${interaction.client.emoji.fun} Fun \`[${cmdList.length}]\`**`
+                            : '**Fun Continued**',
+                        value: commands
+                    })
+                })
                 interaction
                     .reply({
                         embeds: [embed],

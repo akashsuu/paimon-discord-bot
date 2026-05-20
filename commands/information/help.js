@@ -1,4 +1,4 @@
-const { EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js')
 
 module.exports = {
     name: 'help',
@@ -6,173 +6,83 @@ module.exports = {
     category: 'info',
     cooldown: 5,
     premium: true,
-    run: async (client, message, args) => {
-        let prefix = message.guild?.prefix || client.config.PREFIX; // Default prefix if not set
+    run: async (client, message) => {
+        const prefix = message.guild?.prefix || client.config.PREFIX
+        const totalCommands = client.util.countCommandsAndSubcommands(client)
         const menuOption = (option) => ({
             ...option,
             emoji: client.util.componentEmoji(option.emoji)
         })
 
-        const row1 = new ActionRowBuilder().addComponents(
+        const commandGroups = [
+            { label: 'AntiNuke', description: 'Security, whitelist, panic and protection', value: 'antinuke', emoji: client.emoji.antinuke },
+            { label: 'Moderation', description: 'Ban, mute, purge and server control', value: 'moderation', emoji: client.emoji.mod },
+            { label: 'Automod', description: 'Auto filters, anti spam and safe chat', value: 'automod', emoji: client.emoji.automod },
+            { label: 'Logger', description: 'Server logs and event tracking', value: 'logger', emoji: client.emoji.logs },
+            { label: 'Utility', description: 'Info, avatar, stats and useful tools', value: 'utility', emoji: client.emoji.utillity },
+            { label: 'Server Utility', description: 'Leaderboards and server helpers', value: 'serverutility', emoji: client.emoji.serverutillity },
+            { label: 'Auto Responder', description: 'Custom automatic replies', value: 'autoresponder', emoji: client.emoji.autoresponder },
+            { label: 'Fun', description: 'Games, rates, gifs and chaos', value: 'fun', emoji: client.emoji.fun },
+            { label: 'Verification', description: 'Verify users and protect joins', value: 'verification', emoji: client.emoji.verification },
+            { label: 'Join To Create', description: 'Temporary voice channel system', value: 'jointocreate', emoji: client.emoji.jtc },
+            { label: 'Voice', description: 'Voice moderation and voice tools', value: 'voice', emoji: client.emoji.vc },
+            { label: 'Custom Role', description: 'User custom role setup', value: 'customrole', emoji: client.emoji.customrole },
+            { label: 'Welcomer', description: 'Welcome messages, autoroles and tests', value: 'welcomer', emoji: client.emoji.welcome },
+            { label: 'Sticky', description: 'Sticky messages and channel notes', value: 'sticky', emoji: client.emoji.sticky },
+            { label: 'Ticket', description: 'Ticket panels and support flows', value: 'ticket', emoji: client.emoji.ticket }
+        ]
+
+        const menu = new ActionRowBuilder().addComponents(
             new StringSelectMenuBuilder()
                 .setCustomId('helpop')
-                .setPlaceholder(`❯ akashsuu Get Started!`)
-                .addOptions([
-                    {
-                        label: 'AntiNuke',
-                        description: 'Get All AntiNuke Command List',
-                        value: 'antinuke',
-                        emoji: client.emoji.antinuke
-                    },
-                    {
-                        label: 'Moderation',
-                        description: 'Get All Moderation Command List',
-                        value: 'moderation',
-                        emoji: client.emoji.mod
-                    },
-                    {
-                        label: 'Automod',
-                        description: 'Get All Automod Command List',
-                        value: 'automod',
-                        emoji: client.emoji.automod
-                    },
-                    {
-                        label: 'Logger',
-                        description: 'Get All Logger Command List',
-                        value: 'logger',
-                        emoji: client.emoji.logs
-                    },
-                    {
-                        label: 'Utility',
-                        description: 'Get All Utility Command List',
-                        value: 'utility',
-                        emoji: client.emoji.utillity
-                    },
-                    {
-                        label: 'Server Utility',
-                        description: 'Get All Server Utility Command List',
-                        value: 'serverutility',
-                        emoji: client.emoji.serverutillity
-                    },
-                    {
-                        label: 'Auto Responder',
-                        description: 'Get All Auto Responder Command List',
-                        value: 'autoresponder',
-                        emoji: client.emoji.autoresponder
-                    },
-                    {
-                        label: 'Fun',
-                        description: 'Get All Fun Command List',
-                        value: 'fun',
-                        emoji: client.emoji.fun
-                    }
-                ].map(menuOption))
-        );
+                .setPlaceholder('akashsuu command deck - choose a category')
+                .addOptions(commandGroups.map(menuOption))
+        )
 
-        const row2 = new ActionRowBuilder().addComponents(
-            new StringSelectMenuBuilder()
-                .setCustomId('helpop2')
-                .setPlaceholder(`❯ akashsuu Get Started!`)
-                .addOptions([
-                    {
-                        label: 'Verification',
-                        description: 'Get All Verification Command List',
-                        value: 'verification',
-                        emoji: client.emoji.verification
-                    },
-                    {
-                        label: 'Join To Create',
-                        description: 'Get All Join To Create Command List',
-                        value: 'jointocreate',
-                        emoji: client.emoji.jtc
-                    },
-                    {
-                        label: 'Voice',
-                        description: 'Get All Voice Command List',
-                        value: 'voice',
-                        emoji: client.emoji.vc
-                    },
-                    {
-                        label: 'Custom Role',
-                        description: 'Get All Custom Role Command List',
-                        value: 'customrole',
-                        emoji: client.emoji.customrole
-                    },
-                    {
-                        label: 'Welcomer',
-                        description: 'Get All Welcomer Command List',
-                        value: 'welcomer',
-                        emoji: client.emoji.welcome
-                    },
-                    {
-                        label: 'Sticky',
-                        description: 'Get All Sticky Command List',
-                        value: 'sticky',
-                        emoji: client.emoji.sticky
-                    },
-                    {
-                    label : 'Ticket',
-                    description : 'Get All Ticket Command List',
-                    value : 'ticket',
-                    emoji : client.emoji.ticket
-                    },
-                ].map(menuOption))
-        );
-
-        const categories = {
-            category1: [
-                `**${client.emoji.antinuke} \`:\` AntiNuke**`,
-                `**${client.emoji.mod} \`:\` Moderation**`,
-                `**${client.emoji.automod} \`:\` Automod**`,
-                `**${client.emoji.logs} \`:\` Logger**`,
-                `**${client.emoji.utillity} \`:\` Utility**`,
-                `**${client.emoji.serverutillity} \`:\` Server Utility**`,
-                `**${client.emoji.autoresponder} \`:\` Auto Responder**`,
-                `**${client.emoji.fun} \`:\` Fun**`
-
-            ],
-            category2: [
-                `**${client.emoji.verification} \`:\` Verification**`,
-                `**${client.emoji.jtc} \`:\` Join To Create**`,
-                `**${client.emoji.vc} \`:\` Voice**`,
-                `**${client.emoji.customrole} \`:\` Custom Role**`,
-                `**${client.emoji.welcome} \`:\` Welcomer**`,
-                `**${client.emoji.sticky} \`:\` Sticky**`,
-                `**${client.emoji.ticket} \`:\` Ticket**`
-            ]
-        };
+        const categoryLines = commandGroups.map((category, index) => {
+            const number = `${index + 1}`.padStart(2, '0')
+            return `${category.emoji} \`${number}\` **${category.label}**`
+        })
 
         const embed = new EmbedBuilder()
             .setColor(client.color)
             .setAuthor({
-                name: message.author.tag,
-                iconURL: message.author.displayAvatarURL({ dynamic: true })
+                name: 'akashsuu command deck',
+                iconURL: client.user.displayAvatarURL({ dynamic: true })
             })
             .setThumbnail(client.user.displayAvatarURL({ dynamic: true }))
             .setDescription(
-                `${client.emoji.dot} **Prefix for this server:** \`${prefix}\`\n` +
-                `${client.emoji.dot} **Total Commands:** \`${client.util.countCommandsAndSubcommands(client)}\`\n` +
-                `${client.emoji.dot} **Type \`&antinuke enable\` to get started!**\n\n${client.config.baseText}`
+                `**Hello ${message.author.username}, welcome to the akashsuu deck.**\n` +
+                `Pick a module from the dropdown below to reveal its commands.\n\n` +
+                `\`\`\`\n[ Prefix   ] ${prefix}\n[ Commands ] ${totalCommands}\n[ Server   ] ${message.guild.name}\n\`\`\``
             )
-            .addFields({
-                name: `${client.emoji.categories} **__Categories__**`,
-                value: categories.category1.join('\n'),
-                inline: true
-            })
-            .addFields({
-                name: '\u200B',
-                value: categories.category2.join('\n'),
-                inline: true
-            })
-            .addFields({
-                name: `${client.emoji.link} **__Links__**`,
-                value: `**[Invite Me](https://discord.com/api/oauth2/authorize?client_id=${client.user.id}&permissions=8&scope=bot) | [Support Server](${client.config.support})**`
-            })
+            .addFields(
+                {
+                    name: `${client.emoji.categories} **Core Modules**`,
+                    value: categoryLines.slice(0, 8).join('\n'),
+                    inline: true
+                },
+                {
+                    name: '**Extra Modules**',
+                    value: categoryLines.slice(8).join('\n'),
+                    inline: true
+                },
+                {
+                    name: '**Launch Notes**',
+                    value:
+                        `Use \`${prefix}antinuke enable\` to start protection.\n` +
+                        `Use the dropdown below to open any command category.`
+                },
+                {
+                    name: `${client.emoji.link} **Links**`,
+                    value: `**[Invite Me](https://discord.com/api/oauth2/authorize?client_id=${client.user.id}&permissions=8&scope=bot)  |  [Support Server](${client.config.support})**`
+                }
+            )
             .setFooter({
-                text: `Made by akashsuu`,
+                text: `Made by akashsuu | Requested by ${message.author.tag}`,
                 iconURL: client.user.displayAvatarURL({ dynamic: true })
-            });
+            })
 
-        await message.channel.send({ embeds: [embed], components: [row1, row2] });
+        await message.channel.send({ embeds: [embed], components: [menu] })
     }
-};
+}
