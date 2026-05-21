@@ -8,13 +8,30 @@ const {
     ButtonStyle
 } = require('discord.js')
 const axios = require('axios')
+const {
+    AudioPlayerStatus,
+    NoSubscriberBehavior,
+    VoiceConnectionStatus,
+    createAudioPlayer,
+    createAudioResource,
+    entersState,
+    getVoiceConnection,
+    joinVoiceChannel
+} = require('@discordjs/voice')
+const { execFile } = require('child_process')
+const fs = require('fs/promises')
+const os = require('os')
+const path = require('path')
+const { promisify } = require('util')
 const config = require(`${process.cwd()}/config.json`)
 
 const GROQ_CHAT_URL = 'https://api.groq.com/openai/v1/chat/completions'
 const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile'
 const DEFAULT_LOCAL_URL = 'http://127.0.0.1:1234'
+const execFileAsync = promisify(execFile)
 
 const cleanText = (value) => String(value || '').replace(/\s+/g, ' ').trim()
+const limitVoiceText = (value) => cleanText(value).slice(0, 240)
 
 const getLocalBaseUrl = (client) => {
     return (
@@ -61,6 +78,90 @@ const saveLocalMemoryTurn = async (client, message, userText, botText) => {
         at: Date.now()
     })
     await client.db.set(key, memory.slice(-8))
+}
+
+const createWindowsVoiceFile = async (text) => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'akashsuu-voicechat-'))
+    const outputPath = path.join(tempDir, 'voice.wav')
+    const script = `
+        & {
+        param([string]$Text, [string]$OutputPath)
+        Add-Type -AssemblyName System.Speech
+        $speaker = New-Object System.Speech.Synthesis.SpeechSynthesizer
+        $speaker.Rate = 1
+        $speaker.Volume = 100
+        $speaker.SetOutputToWaveFile($OutputPath)
+        $speaker.Speak($Text)
+        $speaker.Dispose()
+        }
+    `
+
+    try {
+        await execFileAsync('powershell.exe', [
+            '-NoProfile',
+            '-ExecutionPolicy',
+            'Bypass',
+            '-Command',
+            script,
+            limitVoiceText(text),
+            outputPath
+        ], {
+            timeout: 30000,
+            windowsHide: true
+        })
+
+        const stat = await fs.stat(outputPath)
+        if (!stat.size) throw new Error('Windows TTS returned an empty audio file')
+        return { outputPath, tempDir }
+    } catch (err) {
+        await fs.rm(tempDir, { recursive: true, force: true }).catch(() => null)
+        throw err
+    }
+}
+
+const speakVoiceChatReply = async (client, message, voiceChannel, text) => {
+    client.voiceChatPlayers ??= new Collection()
+
+    let state = client.voiceChatPlayers.get(message.guild.id)
+    if (!state) {
+        const player = createAudioPlayer({
+            behaviors: {
+                noSubscriber: NoSubscriberBehavior.Pause
+            }
+        })
+        player.on('error', (err) => client.logger?.log?.(`voicechat player error: ${err.message}`, 'error'))
+        state = { player, busy: false }
+        client.voiceChatPlayers.set(message.guild.id, state)
+    }
+
+    if (state.busy) return false
+    state.busy = true
+
+    let tempDir = null
+    try {
+        const generated = await createWindowsVoiceFile(text)
+        tempDir = generated.tempDir
+
+        const connection = getVoiceConnection(message.guild.id) || joinVoiceChannel({
+            channelId: voiceChannel.id,
+            guildId: message.guild.id,
+            adapterCreator: message.guild.voiceAdapterCreator,
+            selfDeaf: false,
+            selfMute: false
+        })
+
+        await entersState(connection, VoiceConnectionStatus.Ready, 15000)
+        connection.subscribe(state.player)
+
+        const resource = createAudioResource(generated.outputPath)
+        state.player.play(resource)
+        await entersState(state.player, AudioPlayerStatus.Playing, 15000).catch(() => null)
+        await entersState(state.player, AudioPlayerStatus.Idle, 120000).catch(() => null)
+        return true
+    } finally {
+        state.busy = false
+        if (tempDir) await fs.rm(tempDir, { recursive: true, force: true }).catch(() => null)
+    }
 }
 
 const buildLocalMemoryMessages = (memory) => {
@@ -453,6 +554,94 @@ module.exports = async (client) => {
             let prefix = message.guild.prefix || client.config.PREFIX
             const mentionRegexPrefix = RegExp(`^<@!?${client.user.id}>`)
             const prefix1 = message.content.match(mentionRegexPrefix) ? message.content.match(mentionRegexPrefix)[0] : prefix;
+
+            const voiceChatbotChannelId = await client.db.get(`voice_chatbot_channel_${message.guild.id}`)
+            if (
+                voiceChatbotChannelId === message.channel.id &&
+                !message.content.startsWith(prefix1) &&
+                !message.content.match(mentionRegexPrefix)
+            ) {
+                const prompt = cleanText(message.content)
+                if (!prompt) return
+
+                client.voiceChatbotCooldowns ??= new Collection()
+                const cooldownKey = `${message.guild.id}:${message.author.id}`
+                const lastUsed = client.voiceChatbotCooldowns.get(cooldownKey) || 0
+                if (Date.now() - lastUsed < 5000) return
+                client.voiceChatbotCooldowns.set(cooldownKey, Date.now())
+
+                const voiceChannel = message.member?.voice?.channel
+                if (!voiceChannel) {
+                    return message.reply({
+                        content: 'Join a voice channel first, then chat here and I will speak there.',
+                        allowedMentions: { repliedUser: false }
+                    }).catch(() => null)
+                }
+
+                const botMember = message.guild.members.me
+                const voicePermissions = voiceChannel.permissionsFor(botMember)
+                if (!voicePermissions?.has(PermissionsBitField.Flags.Connect) || !voicePermissions?.has(PermissionsBitField.Flags.Speak)) {
+                    return message.reply({
+                        content: 'I need **Connect** and **Speak** permission in your voice channel.',
+                        allowedMentions: { repliedUser: false }
+                    }).catch(() => null)
+                }
+
+                const baseUrl = getLocalBaseUrl(client)
+                await message.channel.sendTyping().catch(() => null)
+
+                try {
+                    const model = process.env.LOCAL_CHATBOT_MODEL || process.env.OLLAMA_MODEL || client.config.LOCAL_CHATBOT_MODEL || client.config.OLLAMA_MODEL || await getFirstLocalModel(client, baseUrl)
+                    if (!model) {
+                        return message.reply({
+                            content: 'No local model found. Start LM Studio, load a model, then try again.',
+                            allowedMentions: { repliedUser: false }
+                        }).catch(() => null)
+                    }
+
+                    const memoryDisabled = await client.db.get(`local_chatbot_memory_disabled_${message.guild.id}_${message.channel.id}`)
+                    const memory = memoryDisabled ? [] : await getLocalMemory(client, message.guild.id, message.channel.id)
+                    const systemPrompt = await getConfiguredLocalPrompt(client, message.guild.id, message.channel.id)
+                    const result = await askAutoLocalChatbot({
+                        client,
+                        baseUrl,
+                        model,
+                        content: prompt.slice(0, 900),
+                        username: message.author.username,
+                        guildName: message.guild.name,
+                        memory,
+                        systemPrompt: cleanText(`${systemPrompt}\nReply in one short sentence. This reply will be spoken in a voice channel.`)
+                    })
+
+                    await saveOllamaUsage(client, message.guild.id, { ...result, model })
+                    if (!memoryDisabled) {
+                        await saveLocalMemoryTurn(client, message, prompt, result.reply)
+                    }
+
+                    await message.reply({
+                        content: result.reply,
+                        allowedMentions: { repliedUser: false, parse: [] }
+                    }).catch(() => null)
+
+                    const played = await speakVoiceChatReply(client, message, voiceChannel, result.reply)
+                    if (!played) {
+                        await message.channel.send({
+                            content: 'I am still speaking the last reply. Try again in a moment.',
+                            allowedMentions: { parse: [] }
+                        }).catch(() => null)
+                    }
+                    return
+                } catch (err) {
+                    client.logger?.log?.(`voicechat error: ${err.response?.data?.error || err.message}`, 'error')
+                    const unauthorized = err.response?.status === 401
+                    return message.reply({
+                        content: unauthorized
+                            ? 'LM Studio rejected the request with 401 Unauthorized. Disable API key auth in LM Studio or set `LOCAL_CHATBOT_API_KEY` in `.env`.'
+                            : 'Voice chatbot failed. Make sure LM Studio is running, a model is loaded, and FFmpeg/voice dependencies are installed.',
+                        allowedMentions: { repliedUser: false }
+                    }).catch(() => null)
+                }
+            }
 
             const localChatbotChannelId = await client.db.get(`local_chatbot_channel_${message.guild.id}`)
             if (
