@@ -7,7 +7,284 @@ const {
     WebhookClient,
     ButtonStyle
 } = require('discord.js')
+const axios = require('axios')
 const config = require(`${process.cwd()}/config.json`)
+
+const GROQ_CHAT_URL = 'https://api.groq.com/openai/v1/chat/completions'
+const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile'
+const DEFAULT_LOCAL_URL = 'http://127.0.0.1:1234'
+
+const cleanText = (value) => String(value || '').replace(/\s+/g, ' ').trim()
+
+const getLocalBaseUrl = (client) => {
+    return (
+        process.env.LOCAL_CHATBOT_URL ||
+        process.env.OLLAMA_URL ||
+        client.config.LOCAL_CHATBOT_URL ||
+        client.config.OLLAMA_URL ||
+        DEFAULT_LOCAL_URL
+    ).replace(/\/+$/, '')
+}
+
+const getLocalApiMode = (baseUrl) => {
+    return process.env.LOCAL_CHATBOT_API || (/:(1234)$/.test(baseUrl) ? 'lmstudio' : 'ollama')
+}
+
+const isOpenAICompatibleLocalApi = (baseUrl) => ['openai', 'lmstudio'].includes(getLocalApiMode(baseUrl))
+
+const getLocalApiHeaders = (client) => {
+    const apiKey = process.env.LOCAL_CHATBOT_API_KEY || client.config.LOCAL_CHATBOT_API_KEY
+    return apiKey ? { Authorization: `Bearer ${apiKey}` } : {}
+}
+
+const extractLocalModelIds = (data) => {
+    const models = data?.data || data?.models || []
+    return models
+        .map((model) => model.id || model.name || model.path)
+        .filter(Boolean)
+}
+
+const getLocalMemoryKey = (guildId, channelId) => `local_chatbot_memory_${guildId}_${channelId}`
+const getLocalPromptKey = (guildId, channelId) => `local_chatbot_prompt_${guildId}_${channelId}`
+
+const getLocalMemory = async (client, guildId, channelId) => {
+    return (await client.db.get(getLocalMemoryKey(guildId, channelId))) || []
+}
+
+const saveLocalMemoryTurn = async (client, message, userText, botText) => {
+    const key = getLocalMemoryKey(message.guild.id, message.channel.id)
+    const memory = await getLocalMemory(client, message.guild.id, message.channel.id)
+    memory.push({
+        user: message.author.username,
+        input: cleanText(userText).slice(0, 500),
+        output: cleanText(botText).slice(0, 700),
+        at: Date.now()
+    })
+    await client.db.set(key, memory.slice(-8))
+}
+
+const buildLocalMemoryMessages = (memory) => {
+    return memory.flatMap((entry) => [
+        {
+            role: 'user',
+            content: `${entry.user}: ${entry.input}`
+        },
+        {
+            role: 'assistant',
+            content: entry.output
+        }
+    ])
+}
+
+const getConfiguredLocalPrompt = async (client, guildId, channelId) => {
+    return cleanText(
+        await client.db.get(getLocalPromptKey(guildId, channelId)) ||
+        process.env.LOCAL_CHATBOT_SYSTEM_PROMPT ||
+        client.config.LOCAL_CHATBOT_SYSTEM_PROMPT
+    )
+}
+
+const getLocalSystemMessages = (systemPrompt) => {
+    const prompt = cleanText(systemPrompt)
+    const wordRule = cleanText(process.env.LOCAL_CHATBOT_REPLY_WORDS)
+    const parts = []
+
+    if (prompt) parts.push(prompt)
+    if (wordRule) parts.push(`Always reply in ${wordRule} words only.`)
+
+    return parts.length ? [{ role: 'system', content: parts.join('\n') }] : []
+}
+
+const getFirstLocalModel = async (client, baseUrl) => {
+    if (getLocalApiMode(baseUrl) === 'lmstudio') {
+        const response = await axios.get(`${baseUrl}/api/v1/models`, {
+            headers: getLocalApiHeaders(client),
+            timeout: 8000
+        })
+        return extractLocalModelIds(response.data)[0] || null
+    }
+
+    if (isOpenAICompatibleLocalApi(baseUrl)) {
+        const response = await axios.get(`${baseUrl}/v1/models`, {
+            headers: getLocalApiHeaders(client),
+            timeout: 8000
+        })
+        return extractLocalModelIds(response.data)[0] || null
+    }
+
+    const response = await axios.get(`${baseUrl}/api/tags`, {
+        timeout: 8000
+    })
+    return response.data?.models?.[0]?.name || null
+}
+
+const saveOllamaUsage = async (client, guildId, usage) => {
+    const key = `ollama_usage_${guildId}`
+    const current = await client.db.get(key) || {
+        requests: 0,
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
+        lastModel: null,
+        lastDurationMs: 0,
+        updatedAt: null
+    }
+
+    current.requests += 1
+    current.promptTokens += usage.promptTokens
+    current.completionTokens += usage.completionTokens
+    current.totalTokens += usage.promptTokens + usage.completionTokens
+    current.lastModel = usage.model
+    current.lastDurationMs = usage.durationMs
+    current.updatedAt = Date.now()
+
+    await client.db.set(key, current)
+}
+
+const askAutoLocalChatbot = async ({ client, baseUrl, model, content, username, guildName, memory = [], systemPrompt = '' }) => {
+    const started = Date.now()
+    const systemMessages = getLocalSystemMessages(systemPrompt)
+    const memoryMessages = buildLocalMemoryMessages(memory)
+
+    if (getLocalApiMode(baseUrl) === 'lmstudio') {
+        const response = await axios.post(
+            `${baseUrl}/api/v1/chat`,
+            {
+                model,
+                messages: [
+                    ...systemMessages,
+                    ...memoryMessages,
+                    {
+                        role: 'user',
+                        content: `${username}: ${content}`
+                    }
+                ],
+                temperature: 0.8,
+                max_tokens: 220,
+                stream: false
+            },
+            {
+                headers: getLocalApiHeaders(client),
+                timeout: 60000
+            }
+        )
+
+        const reply = response.data?.choices?.[0]?.message?.content || response.data?.message?.content || response.data?.content
+        if (!reply) throw new Error('LM Studio API returned an invalid response')
+
+        return {
+            reply: cleanText(reply).slice(0, 1900),
+            promptTokens: Number(response.data?.usage?.prompt_tokens) || 0,
+            completionTokens: Number(response.data?.usage?.completion_tokens) || 0,
+            durationMs: Date.now() - started
+        }
+    }
+
+    if (isOpenAICompatibleLocalApi(baseUrl)) {
+        const response = await axios.post(
+            `${baseUrl}/v1/chat/completions`,
+            {
+                model,
+                messages: [
+                    ...systemMessages,
+                    ...memoryMessages,
+                    {
+                        role: 'user',
+                        content: `${username}: ${content}`
+                    }
+                ],
+                temperature: 0.8,
+                max_tokens: 220
+            },
+            {
+                headers: getLocalApiHeaders(client),
+                timeout: 60000
+            }
+        )
+
+        const reply = response.data?.choices?.[0]?.message?.content
+        if (!reply) throw new Error('Local API returned an invalid response')
+
+        return {
+            reply: cleanText(reply).slice(0, 1900),
+            promptTokens: Number(response.data?.usage?.prompt_tokens) || 0,
+            completionTokens: Number(response.data?.usage?.completion_tokens) || 0,
+            durationMs: Date.now() - started
+        }
+    }
+
+    const response = await axios.post(
+        `${baseUrl}/api/chat`,
+        {
+            model,
+            stream: false,
+            messages: [
+                ...systemMessages,
+                ...memoryMessages,
+                {
+                    role: 'user',
+                    content: `${username}: ${content}`
+                }
+            ],
+            options: {
+                temperature: 0.8,
+                num_predict: 220
+            }
+        },
+        {
+            timeout: 60000
+        }
+    )
+
+    const reply = response.data?.message?.content
+    if (!reply) throw new Error('Ollama returned an invalid response')
+
+    return {
+        reply: cleanText(reply).slice(0, 1900),
+        promptTokens: Number(response.data?.prompt_eval_count) || 0,
+        completionTokens: Number(response.data?.eval_count) || 0,
+        durationMs: Math.round((Number(response.data?.total_duration) || 0) / 1000000)
+    }
+}
+
+const askAutoChatbot = async ({ apiKey, model, content, username, guildName }) => {
+    const response = await axios.post(
+        GROQ_CHAT_URL,
+        {
+            model,
+            messages: [
+                {
+                    role: 'system',
+                    content:
+                        `You are akashsuu, a cool savage Discord chatbot in ${guildName}. ` +
+                        'Reply in plain text only. Keep replies short, funny, casual, and helpful. ' +
+                        'Do not use embeds, markdown tables, slurs, threats, harassment, sexual content, or private data. ' +
+                        'If asked for harmful content, refuse with a playful harmless joke.'
+                },
+                {
+                    role: 'user',
+                    content: `${username}: ${content}`
+                }
+            ],
+            temperature: 0.9,
+            max_tokens: 160,
+            top_p: 0.9
+        },
+        {
+            headers: {
+                Authorization: `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
+            },
+            timeout: 20000
+        }
+    )
+
+    const reply = response.data?.choices?.[0]?.message?.content
+    if (!reply) throw new Error('Groq chatbot returned an invalid response')
+
+    return cleanText(reply).slice(0, 1800)
+}
+
 module.exports = async (client) => {
     client.on('messageCreate', async (message) => {
         if (message.author.bot || !message.guild || message.system) return
@@ -176,6 +453,117 @@ module.exports = async (client) => {
             let prefix = message.guild.prefix || client.config.PREFIX
             const mentionRegexPrefix = RegExp(`^<@!?${client.user.id}>`)
             const prefix1 = message.content.match(mentionRegexPrefix) ? message.content.match(mentionRegexPrefix)[0] : prefix;
+
+            const localChatbotChannelId = await client.db.get(`local_chatbot_channel_${message.guild.id}`)
+            if (
+                localChatbotChannelId === message.channel.id &&
+                !message.content.startsWith(prefix1) &&
+                !message.content.match(mentionRegexPrefix)
+            ) {
+                const prompt = cleanText(message.content)
+                if (!prompt) return
+
+                client.localChatbotCooldowns ??= new Collection()
+                const cooldownKey = `${message.guild.id}:${message.author.id}`
+                const lastUsed = client.localChatbotCooldowns.get(cooldownKey) || 0
+                if (Date.now() - lastUsed < 3500) return
+                client.localChatbotCooldowns.set(cooldownKey, Date.now())
+
+                const baseUrl = getLocalBaseUrl(client)
+                await message.channel.sendTyping().catch(() => null)
+
+                try {
+                    const model = process.env.LOCAL_CHATBOT_MODEL || process.env.OLLAMA_MODEL || client.config.LOCAL_CHATBOT_MODEL || client.config.OLLAMA_MODEL || await getFirstLocalModel(client, baseUrl)
+                    if (!model) {
+                        return message.reply({
+                            content: 'No local model found. Start your local API and load a model first.',
+                            allowedMentions: { repliedUser: false }
+                        }).catch(() => null)
+                    }
+
+                    const memoryDisabled = await client.db.get(`local_chatbot_memory_disabled_${message.guild.id}_${message.channel.id}`)
+                    const memory = memoryDisabled ? [] : await getLocalMemory(client, message.guild.id, message.channel.id)
+                    const systemPrompt = await getConfiguredLocalPrompt(client, message.guild.id, message.channel.id)
+                    const result = await askAutoLocalChatbot({
+                        client,
+                        baseUrl,
+                        model,
+                        content: prompt.slice(0, 1000),
+                        username: message.author.username,
+                        guildName: message.guild.name,
+                        memory,
+                        systemPrompt
+                    })
+                    await saveOllamaUsage(client, message.guild.id, { ...result, model })
+                    if (!memoryDisabled) {
+                        await saveLocalMemoryTurn(client, message, prompt, result.reply)
+                    }
+
+                    return message.reply({
+                        content: result.reply,
+                        allowedMentions: { repliedUser: false, parse: [] }
+                    })
+                } catch (err) {
+                    client.logger?.log?.(`local auto-chatbot error: ${err.response?.data?.error || err.message}`, 'error')
+                    const unauthorized = err.response?.status === 401
+                    return message.reply({
+                        content: unauthorized
+                            ? 'LM Studio rejected the request with 401 Unauthorized. Set `LOCAL_CHATBOT_API_KEY` in `.env`, or disable API key auth in LM Studio.'
+                            : `Local API is not responding at \`${baseUrl}\`, or the selected model is invalid.`,
+                        allowedMentions: { repliedUser: false }
+                    }).catch(() => null)
+                }
+            }
+
+            const chatbotChannelId = await client.db.get(`chatbot_channel_${message.guild.id}`)
+            if (
+                chatbotChannelId === message.channel.id &&
+                !message.content.startsWith(prefix1) &&
+                !message.content.match(mentionRegexPrefix)
+            ) {
+                const apiKey = process.env.GROQ_API_KEY || client.config.GROQ_API_KEY
+                const model = process.env.GROQ_MODEL || client.config.GROQ_MODEL || DEFAULT_GROQ_MODEL
+                const prompt = cleanText(message.content)
+
+                if (!apiKey) {
+                    return message.reply({
+                        content: 'GROQ_API_KEY missing in .env. Add it and restart me.',
+                        allowedMentions: { repliedUser: false }
+                    }).catch(() => null)
+                }
+
+                if (!prompt) return
+
+                client.chatbotCooldowns ??= new Collection()
+                const cooldownKey = `${message.guild.id}:${message.author.id}`
+                const lastUsed = client.chatbotCooldowns.get(cooldownKey) || 0
+                if (Date.now() - lastUsed < 3500) return
+                client.chatbotCooldowns.set(cooldownKey, Date.now())
+
+                await message.channel.sendTyping().catch(() => null)
+
+                try {
+                    const reply = await askAutoChatbot({
+                        apiKey,
+                        model,
+                        content: prompt.slice(0, 900),
+                        username: message.author.username,
+                        guildName: message.guild.name
+                    })
+
+                    return message.reply({
+                        content: reply,
+                        allowedMentions: { repliedUser: false, parse: [] }
+                    })
+                } catch (err) {
+                    client.logger?.log?.(`chatbot error: ${err.response?.data?.error?.message || err.message}`, 'error')
+                    return message.reply({
+                        content: 'chatbot api is down or the Groq key/model is invalid.',
+                        allowedMentions: { repliedUser: false }
+                    }).catch(() => null)
+                }
+            }
+
             let datab = client.noprefix || []
             if (!datab.includes(message.author.id)) {
                 if (!message.content.startsWith(prefix1)) return

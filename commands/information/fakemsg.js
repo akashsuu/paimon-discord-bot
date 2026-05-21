@@ -6,6 +6,84 @@ const requestHeaders = {
     'User-Agent': 'akashsuu-discord-bot/1.0'
 }
 
+const loadOptionalImage = async (url) => {
+    if (!url) return null
+
+    try {
+        const response = await axios.get(url, {
+            headers: requestHeaders,
+            responseType: 'arraybuffer',
+            timeout: 10000
+        })
+        return loadImage(Buffer.from(response.data))
+    } catch {
+        return null
+    }
+}
+
+const getAvatarDecorationUrl = (user) => {
+    if (typeof user.avatarDecorationURL === 'function') {
+        return user.avatarDecorationURL({ size: 256 })
+    }
+
+    const asset = user.avatarDecorationData?.asset
+    return asset ? `https://cdn.discordapp.com/avatar-decoration-presets/${asset}.png` : null
+}
+
+const getBadgeLabels = (user) => {
+    const flags = user.flags?.toArray?.() || []
+    const badges = []
+
+    if (user.bot) badges.push({ text: 'APP', bg: '#5865f2', fg: '#ffffff' })
+    if (flags.includes('ActiveDeveloper')) badges.push({ text: 'DEV', bg: '#3b3d45', fg: '#f2f3f5' })
+    if (flags.includes('HypeSquadOnlineHouse1')) badges.push({ text: 'BRV', bg: '#3b3d45', fg: '#f2f3f5' })
+    if (flags.includes('HypeSquadOnlineHouse2')) badges.push({ text: 'BRL', bg: '#3b3d45', fg: '#f2f3f5' })
+    if (flags.includes('HypeSquadOnlineHouse3')) badges.push({ text: 'BAL', bg: '#3b3d45', fg: '#f2f3f5' })
+    if (flags.includes('PremiumEarlySupporter')) badges.push({ text: 'OG', bg: '#3b3d45', fg: '#f2f3f5' })
+
+    return badges.slice(0, 3)
+}
+
+const drawBadge = (ctx, x, y, badge) => {
+    ctx.font = '700 20px "Segoe UI", Arial'
+    const width = Math.max(54, ctx.measureText(badge.text).width + 24)
+
+    ctx.fillStyle = badge.bg
+    roundRect(ctx, x, y, width, 28, 7)
+    ctx.fill()
+    ctx.fillStyle = badge.fg
+    ctx.fillText(badge.text, x + 12, y + 21)
+
+    return width
+}
+
+const softenCanvas = (ctx, width, height, strength = 0.08) => {
+    const image = ctx.getImageData(0, 0, width, height)
+    const source = image.data
+    const output = new Uint8ClampedArray(source)
+    const mix = Math.max(0, Math.min(strength, 0.18))
+
+    for (let y = 1; y < height - 1; y++) {
+        for (let x = 1; x < width - 1; x++) {
+            const index = (y * width + x) * 4
+
+            for (let channel = 0; channel < 3; channel++) {
+                const average = (
+                    source[index + channel - 4] +
+                    source[index + channel + 4] +
+                    source[index + channel - width * 4] +
+                    source[index + channel + width * 4]
+                ) / 4
+
+                output[index + channel] = source[index + channel] * (1 - mix) + average * mix
+            }
+        }
+    }
+
+    image.data.set(output)
+    ctx.putImageData(image, 0, 0)
+}
+
 const getUserFromMention = async (message, mention) => {
     if (!mention) return null
 
@@ -32,6 +110,26 @@ const wrapText = (ctx, text, maxWidth) => {
 
     if (line) lines.push(line)
     return lines
+}
+
+const fitText = (ctx, text, maxWidth) => {
+    if (ctx.measureText(text).width <= maxWidth) return text
+
+    let trimmed = text
+    while (trimmed.length > 1 && ctx.measureText(`${trimmed}...`).width > maxWidth) {
+        trimmed = trimmed.slice(0, -1)
+    }
+
+    return `${trimmed}...`
+}
+
+const formatDiscordTime = () => {
+    const now = new Date()
+    let hours = now.getHours()
+    const minutes = `${now.getMinutes()}`.padStart(2, '0')
+    const suffix = hours >= 12 ? 'PM' : 'AM'
+    hours = hours % 12 || 12
+    return `${hours}:${minutes} ${suffix}`
 }
 
 const roundRect = (ctx, x, y, width, height, radius) => {
@@ -68,90 +166,83 @@ module.exports = {
         }
 
         try {
-            const avatarResponse = await axios.get(member.user.displayAvatarURL({
+            const user = await client.users.fetch(member.id, { force: true }).catch(() => member.user)
+            const avatarUrl = user.displayAvatarURL({
                 extension: 'png',
                 size: 256,
                 forceStatic: true
-            }), {
-                headers: requestHeaders,
-                responseType: 'arraybuffer',
-                timeout: 10000
             })
+            const [avatarResponse, decoration] = await Promise.all([
+                axios.get(avatarUrl, {
+                    headers: requestHeaders,
+                    responseType: 'arraybuffer',
+                    timeout: 10000
+                }),
+                loadOptionalImage(getAvatarDecorationUrl(user))
+            ])
             const avatar = await loadImage(Buffer.from(avatarResponse.data))
 
-            const canvas = createCanvas(920, 260)
+            const canvas = createCanvas(1080, 196)
             const ctx = canvas.getContext('2d')
-            const displayName = member.displayName || member.user.username
+            const rawDisplayName = member.displayName || user.username
             const nameColor = member.displayHexColor && member.displayHexColor !== '#000000'
                 ? member.displayHexColor
                 : '#f2f3f5'
-            const time = new Date().toLocaleTimeString('en-US', {
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: false
-            })
+            const time = formatDiscordTime()
 
             ctx.fillStyle = '#313338'
             ctx.fillRect(0, 0, canvas.width, canvas.height)
+            ctx.fillStyle = '#232428'
+            ctx.fillRect(0, 0, canvas.width, 1)
+            ctx.fillRect(0, canvas.height - 1, canvas.width, 1)
 
-            ctx.fillStyle = '#2b2d31'
-            roundRect(ctx, 28, 28, 864, 204, 10)
-            ctx.fill()
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.018)'
+            ctx.fillRect(0, 0, canvas.width, canvas.height)
 
             ctx.save()
             ctx.beginPath()
-            ctx.arc(82, 86, 34, 0, Math.PI * 2)
+            ctx.arc(88, 84, 50, 0, Math.PI * 2)
             ctx.closePath()
             ctx.clip()
-            ctx.drawImage(avatar, 48, 52, 68, 68)
+            ctx.drawImage(avatar, 38, 34, 100, 100)
             ctx.restore()
 
-            ctx.font = 'bold 22px Arial'
+            if (decoration) {
+                ctx.drawImage(decoration, 22, 18, 132, 132)
+            }
+
+            ctx.font = '600 34px "Segoe UI", Arial'
+            const displayName = fitText(ctx, rawDisplayName, 460)
             ctx.fillStyle = nameColor
-            ctx.fillText(displayName, 132, 72)
-            let x = 132 + ctx.measureText(displayName).width + 10
+            ctx.fillText(displayName, 176, 64)
+            let x = 176 + ctx.measureText(displayName).width + 12
 
-            if (member.user.bot) {
-                ctx.fillStyle = '#5865f2'
-                roundRect(ctx, x, 52, 42, 23, 5)
-                ctx.fill()
-                ctx.font = 'bold 13px Arial'
-                ctx.fillStyle = '#ffffff'
-                ctx.fillText('APP', x + 8, 68)
-                x += 52
+            for (const badge of getBadgeLabels(user)) {
+                x += drawBadge(ctx, x, 38, badge) + 10
             }
 
-            if (member.id === message.guild.ownerId) {
-                ctx.fillStyle = '#f0b232'
-                roundRect(ctx, x, 52, 68, 23, 5)
-                ctx.fill()
-                ctx.font = 'bold 12px Arial'
-                ctx.fillStyle = '#1e1f22'
-                ctx.fillText('OWNER', x + 10, 68)
-                x += 78
-            }
-
-            ctx.font = '16px Arial'
+            ctx.font = '26px "Segoe UI", Arial'
             ctx.fillStyle = '#949ba4'
-            ctx.fillText(`Today at ${time}`, x, 70)
+            ctx.fillText(time, x, 64)
 
-            ctx.font = '22px Arial'
+            ctx.font = '40px Arial'
             ctx.fillStyle = '#dbdee1'
-            const lines = wrapText(ctx, content, 720).slice(0, 5)
+            const lines = wrapText(ctx, content, 840).slice(0, 2)
             lines.forEach((line, index) => {
-                ctx.fillText(line, 132, 112 + index * 30)
+                ctx.fillText(line, 176, 116 + index * 44)
             })
 
-            ctx.font = '12px Arial'
-            ctx.fillStyle = '#6d7380'
-            ctx.fillText('simulated message by akashsuu', 704, 218)
+            softenCanvas(ctx, canvas.width, canvas.height)
 
             const attachment = new AttachmentBuilder(canvas.toBuffer('image/png'), {
                 name: 'fakemsg.png'
             })
             const embed = client.util.embed()
                 .setColor(client.color)
-                .setTitle('Fake Message')
+                .setAuthor({
+                    name: `Message from ${rawDisplayName}`,
+                    iconURL: user.displayAvatarURL({ dynamic: true })
+                })
                 .setImage('attachment://fakemsg.png')
                 .setFooter({
                     text: 'akashsuu',
@@ -164,7 +255,7 @@ module.exports = {
                 embeds: [
                     client.util.embed()
                         .setColor(client.color)
-                        .setDescription(`${client.emoji.cross} | fake message generator failed.`)
+                        .setDescription(`${client.emoji.cross} | message generator failed.`)
                 ]
             })
         }
