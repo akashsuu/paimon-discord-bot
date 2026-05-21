@@ -60,21 +60,33 @@ const buildTeacherMessages = (topic, username) => [
         role: 'system',
         content:
             'You are Akashsuu Teacher, a patient real teacher. Teach step by step in clear English. ' +
-            'Use short paragraphs, bullet points, numbered steps, examples, common mistakes, and a small recap. ' +
+            'Use bullet points as the main format. Avoid long paragraphs. Use clear section headings, numbered steps, examples, common mistakes, and a small recap. ' +
             'Explain like the student is new but smart. Be detailed, practical, and calm. Do not be too short.'
     },
     {
         role: 'user',
         content:
             `${username} wants to learn: ${topic}\n\n` +
-            'Create a detailed lesson with this structure:\n' +
-            '1. Simple introduction\n' +
-            '2. What you need to know first\n' +
-            '3. Step-by-step teaching\n' +
-            '4. Important points\n' +
-            '5. Example or mini practice\n' +
-            '6. Common mistakes\n' +
-            '7. Quick recap'
+            'Create a detailed bullet-point lesson. Do not write big paragraphs.\n' +
+            'Use this exact style:\n' +
+            '**Simple Introduction**\n' +
+            '- point\n' +
+            '- point\n\n' +
+            '**What You Need To Know First**\n' +
+            '- point\n' +
+            '- point\n\n' +
+            '**Step-By-Step Teaching**\n' +
+            '1. step with bullet details\n' +
+            '2. step with bullet details\n\n' +
+            '**Important Points**\n' +
+            '- point\n' +
+            '- point\n\n' +
+            '**Example Or Mini Practice**\n' +
+            '- example\n\n' +
+            '**Common Mistakes**\n' +
+            '- mistake and fix\n\n' +
+            '**Quick Recap**\n' +
+            '- recap point'
     }
 ]
 

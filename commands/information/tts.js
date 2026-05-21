@@ -1,18 +1,15 @@
 const axios = require('axios')
 const { AttachmentBuilder } = require('discord.js')
-const { execFile } = require('child_process')
 const fs = require('fs/promises')
 const os = require('os')
 const path = require('path')
-const { promisify } = require('util')
 
 const GROQ_TTS_URL = 'https://api.groq.com/openai/v1/audio/speech'
 const DEFAULT_MODEL = 'canopylabs/orpheus-v1-english'
 const DEFAULT_VOICE = 'hannah'
-const KOKORO_BIN = path.join(os.homedir(), '.cache', 'codex-runtimes', 'codex-primary-runtime', 'dependencies', 'python', 'Scripts', 'kokoro-tts.exe')
-const KOKORO_MODEL = path.join(process.cwd(), '.kokoro', 'kokoro-v1.0.onnx')
-const KOKORO_VOICES = path.join(process.cwd(), '.kokoro', 'voices-v1.0.bin')
-const execFileAsync = promisify(execFile)
+const KOKORO_MODEL_ID = 'onnx-community/Kokoro-82M-v1.0-ONNX'
+const KOKORO_SPEED = 0.55
+let kokoroModelPromise = null
 const VOICE_OPTIONS = {
     girl: 'hannah',
     female: 'hannah',
@@ -91,45 +88,34 @@ const createSpeech = async ({ apiKey, model, voice, text }) => {
 }
 
 const createKokoroEnglishSpeech = async ({ text, voice }) => {
+    let tts
+    try {
+        const { KokoroTTS } = require('kokoro-js')
+        kokoroModelPromise ||= KokoroTTS.from_pretrained(KOKORO_MODEL_ID, {
+            dtype: 'q8',
+            device: 'cpu'
+        })
+        tts = await kokoroModelPromise
+    } catch (err) {
+        kokoroModelPromise = null
+        throw new Error(`Kokoro model load failed: ${err.message}`)
+    }
+
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'akashsuu-kokoro-'))
-    const inputPath = path.join(tempDir, 'input.txt')
     const outputPath = path.join(tempDir, 'output.wav')
 
     try {
-        await fs.writeFile(inputPath, text, 'utf8')
-        try {
-            await execFileAsync(KOKORO_BIN, [
-                inputPath,
-                outputPath,
-                '--lang',
-                'en-us',
-                '--voice',
-                voice,
-                '--format',
-                'wav',
-                '--model',
-                KOKORO_MODEL,
-                '--voices',
-                KOKORO_VOICES
-            ], {
-                timeout: 30000,
-                windowsHide: true,
-                env: {
-                    ...process.env,
-                    PYTHONIOENCODING: 'utf-8'
-                }
-            })
-        } catch (err) {
-            const detail = [err.stderr, err.stdout, err.message].filter(Boolean).join('\n')
-            throw new Error(detail || 'Kokoro failed to generate audio')
-        }
-
+        const audioOutput = await tts.generate(cleanText(text), {
+            voice,
+            speed: KOKORO_SPEED
+        })
+        await audioOutput.save(outputPath)
         const audio = await fs.readFile(outputPath)
         if (!audio.length) throw new Error('Kokoro returned an empty audio file')
 
         return {
             audio,
-            model: 'kokoro-v1.0',
+            model: 'kokoro-js-q8',
             voice
         }
     } finally {
@@ -137,12 +123,28 @@ const createKokoroEnglishSpeech = async ({ text, voice }) => {
     }
 }
 
-const createEnglishSpeech = async ({ apiKey, model, text, kokoroVoice, groqVoice }) => {
+const createLocalFirstSpeech = async ({ apiKey, model, groqVoice, kokoroVoice, text }) => {
     try {
-        return await createKokoroEnglishSpeech({ text, voice: kokoroVoice })
-    } catch (err) {
-        if (!apiKey) throw err
-        return createSpeech({ apiKey, model, voice: groqVoice, text })
+        return await createKokoroEnglishSpeech({
+            text,
+            voice: kokoroVoice
+        })
+    } catch (kokoroErr) {
+        if (!apiKey) {
+            throw new Error(`Local Kokoro failed and no Groq API key is set: ${kokoroErr.message}`)
+        }
+
+        const result = await createSpeech({
+            apiKey,
+            model,
+            voice: groqVoice,
+            text
+        })
+
+        return {
+            ...result,
+            model: `${result.model} (api fallback)`
+        }
     }
 }
 
@@ -157,24 +159,16 @@ module.exports = {
         const kokoroMode = ['english', 'en', 'kokoro'].includes(args[0]?.toLowerCase())
         if (kokoroMode) args.shift()
         const voiceMode = args[0]?.toLowerCase()
-        const selectedVoice = kokoroMode ? KOKORO_VOICE_OPTIONS[voiceMode] : VOICE_OPTIONS[voiceMode]
-        const voice = selectedVoice || process.env.GROQ_TTS_VOICE || client.config.GROQ_TTS_VOICE || DEFAULT_VOICE
-        if (selectedVoice) args.shift()
+        const selectedGroqVoice = VOICE_OPTIONS[voiceMode]
+        const selectedKokoroVoice = KOKORO_VOICE_OPTIONS[voiceMode]
+        const groqVoice = selectedGroqVoice || process.env.GROQ_TTS_VOICE || client.config.GROQ_TTS_VOICE || DEFAULT_VOICE
+        const kokoroVoice = selectedKokoroVoice || 'af_heart'
+        if (selectedGroqVoice || selectedKokoroVoice) args.shift()
         let text = cleanText(args.join(' '))
 
         if (!text && message.reference?.messageId) {
             const replied = await message.channel.messages.fetch(message.reference.messageId).catch(() => null)
             text = cleanText(replied?.content)
-        }
-
-        if (!apiKey && !kokoroMode) {
-            return message.channel.send({
-                embeds: [
-                    client.util.embed()
-                        .setColor(client.color)
-                        .setDescription(`${client.emoji.cross} | Missing \`GROQ_API_KEY\`. Add it to your \`.env\` file and restart the bot.`)
-                ]
-            })
         }
 
         if (!text) {
@@ -199,14 +193,17 @@ module.exports = {
 
         try {
             const result = kokoroMode
-                ? await createEnglishSpeech({
+                ? await createKokoroEnglishSpeech({
+                    text,
+                    voice: kokoroVoice
+                })
+                : await createLocalFirstSpeech({
                     apiKey,
                     model,
-                    text,
-                    kokoroVoice: selectedVoice || 'af_heart',
-                    groqVoice: VOICE_OPTIONS[voiceMode] || DEFAULT_VOICE
+                    groqVoice,
+                    kokoroVoice,
+                    text
                 })
-                : await createSpeech({ apiKey, model, voice, text })
             const attachment = new AttachmentBuilder(result.audio, {
                 name: `${makeSafeName(message.author.username)}-tts.${result.extension || 'wav'}`
             })
@@ -214,7 +211,7 @@ module.exports = {
             const embed = client.util.embed()
                 .setColor(client.color)
                 .setTitle('Text To Speech')
-                .setDescription(`Generated ${kokoroMode ? '**English** ' : selectedVoice ? `**${voiceMode}** ` : ''}voice for ${message.author}.`)
+                .setDescription(`Generated ${kokoroMode ? '**Kokoro local** ' : '**local-first** '}voice for ${message.author}.`)
                 .addFields(
                     {
                         name: 'Voice',
@@ -245,6 +242,8 @@ module.exports = {
                         .setDescription(
                             needsTerms
                                 ? `${client.emoji.cross} | Groq TTS needs model terms accepted first.\nOpen: https://console.groq.com/playground?model=canopylabs%2Forpheus-v1-english`
+                                : kokoroMode
+                                    ? `${client.emoji.cross} | Local Kokoro TTS failed: \`${String(err.message || err).slice(0, 220)}\``
                                 : `${client.emoji.cross} | TTS is **currently down** or the selected voice/model is invalid.`
                         )
                 ]

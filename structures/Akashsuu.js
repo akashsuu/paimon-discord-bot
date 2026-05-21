@@ -28,6 +28,11 @@ function normalizeEmoji(value) {
     return value
 }
 
+const formatError = (error) => {
+    if (!error) return 'Unknown error'
+    return String(error.stack || error.message || error).slice(0, 1800)
+}
+
 module.exports = class Akashsuu extends Client {
     constructor() {
         super({
@@ -79,24 +84,31 @@ module.exports = class Akashsuu extends Client {
         this.error = new WebhookClient({
             url: 'https://discord.com/api/webhooks/1375503118992674929/J-HKK5Pa9AIRB9MPBVhyluukGs33RfB1e7Qe340XdIP6jRxAuboDBvUyIDhNhnySZ2v8'
         })
+        this.safeWebhookSend = async (webhook, payload) => {
+            try {
+                await webhook.send(payload)
+            } catch (err) {
+                this.logger?.log?.(`Webhook send failed: ${err.message}`, 'error')
+            }
+        }
 
         this.on('error', (error) => {
-            this.error.send(`\`\`\`js\n${error.stack}\`\`\``)
+            this.safeWebhookSend(this.error, `\`\`\`js\n${formatError(error)}\`\`\``)
         })
         process.on('unhandledRejection', (error) => {
-            this.error.send(`\`\`\`js\n${error.stack}\`\`\``)
+            this.safeWebhookSend(this.error, `\`\`\`js\n${formatError(error)}\`\`\``)
         })
         process.on('uncaughtException', (error) => {
-            this.error.send(`\`\`\`js\n${error.stack}\`\`\``)
+            this.safeWebhookSend(this.error, `\`\`\`js\n${formatError(error)}\`\`\``)
         })
         process.on('warning', (warn) => {
-            this.error.send(`\`\`\`js\n${warn}\`\`\``)
+            this.safeWebhookSend(this.error, `\`\`\`js\n${formatError(warn)}\`\`\``)
         })
         process.on('uncaughtExceptionMonitor', (err, origin) => {
-            this.error.send(`\`\`\`js\n${err},${origin}\`\`\``)
+            this.safeWebhookSend(this.error, `\`\`\`js\n${formatError(err)}\nOrigin: ${origin}\`\`\``)
         })
         this.rest.on('rateLimited', (info) => {
-            this.ratelimit.send({
+            this.safeWebhookSend(this.ratelimit, {
                 content: `\`\`\`js\nTimeout: ${info.retryAfter},\nLimit: ${info.limit},\nMethod: ${info.method},\nPath: ${info.hash},\nRoute: ${info.route},\nGlobal: ${info.global}\nURL : ${info.url}\nScope : ${info.scope}\nMajorPrameter : ${info.majorParameter} Black\`\`\``
             })
         })
