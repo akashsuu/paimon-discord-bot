@@ -11,6 +11,7 @@ const axios = require('axios')
 const {
     AudioPlayerStatus,
     NoSubscriberBehavior,
+    StreamType,
     VoiceConnectionStatus,
     createAudioPlayer,
     createAudioResource,
@@ -29,9 +30,16 @@ const GROQ_CHAT_URL = 'https://api.groq.com/openai/v1/chat/completions'
 const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile'
 const DEFAULT_LOCAL_URL = 'http://127.0.0.1:1234'
 const execFileAsync = promisify(execFile)
+const voiceChatPlayers = new Map()
 
 const cleanText = (value) => String(value || '').replace(/\s+/g, ' ').trim()
 const limitVoiceText = (value) => cleanText(value).slice(0, 240)
+const cleanLocalReply = (value) => {
+    let text = String(value || '')
+    text = text.replace(/<reserved_\d+>[\s\S]*?(?=<reserved_\d+>)/g, '')
+    text = text.replace(/<reserved_\d+>/g, '')
+    return cleanText(text)
+}
 
 const getLocalBaseUrl = (client) => {
     return (
@@ -85,8 +93,9 @@ const createWindowsVoiceFile = async (text) => {
     const outputPath = path.join(tempDir, 'voice.wav')
     const script = `
         & {
-        param([string]$Text, [string]$OutputPath)
         Add-Type -AssemblyName System.Speech
+        $Text = $env:AKASHSUU_VOICE_TEXT
+        $OutputPath = $env:AKASHSUU_VOICE_OUTPUT
         $speaker = New-Object System.Speech.Synthesis.SpeechSynthesizer
         $speaker.Rate = 1
         $speaker.Volume = 100
@@ -102,12 +111,15 @@ const createWindowsVoiceFile = async (text) => {
             '-ExecutionPolicy',
             'Bypass',
             '-Command',
-            script,
-            limitVoiceText(text),
-            outputPath
+            script
         ], {
             timeout: 30000,
-            windowsHide: true
+            windowsHide: true,
+            env: {
+                ...process.env,
+                AKASHSUU_VOICE_TEXT: limitVoiceText(text),
+                AKASHSUU_VOICE_OUTPUT: outputPath
+            }
         })
 
         const stat = await fs.stat(outputPath)
@@ -120,21 +132,22 @@ const createWindowsVoiceFile = async (text) => {
 }
 
 const speakVoiceChatReply = async (client, message, voiceChannel, text) => {
-    client.voiceChatPlayers ??= new Collection()
+    if (!voiceChannel?.joinable) throw new Error('I cannot join that voice channel.')
+    if (!voiceChannel?.speakable) throw new Error('I cannot speak in that voice channel.')
 
-    let state = client.voiceChatPlayers.get(message.guild.id)
+    let state = voiceChatPlayers.get(message.guild.id)
     if (!state) {
         const player = createAudioPlayer({
             behaviors: {
-                noSubscriber: NoSubscriberBehavior.Pause
+                noSubscriber: NoSubscriberBehavior.Play
             }
         })
         player.on('error', (err) => client.logger?.log?.(`voicechat player error: ${err.message}`, 'error'))
         state = { player, busy: false }
-        client.voiceChatPlayers.set(message.guild.id, state)
+        voiceChatPlayers.set(message.guild.id, state)
     }
 
-    if (state.busy) return false
+    if (state.busy) state.player.stop(true)
     state.busy = true
 
     let tempDir = null
@@ -142,27 +155,80 @@ const speakVoiceChatReply = async (client, message, voiceChannel, text) => {
         const generated = await createWindowsVoiceFile(text)
         tempDir = generated.tempDir
 
-        const connection = getVoiceConnection(message.guild.id) || joinVoiceChannel({
+        const adapterCreator = message.guild.voiceAdapterCreator
+        if (typeof adapterCreator !== 'function') {
+            throw new Error('Discord voice adapter is missing. Restart the bot and make sure @discordjs/voice is installed.')
+        }
+
+        const voiceGroup = `akashsuu-${message.guild.id}`
+        let connection = getVoiceConnection(message.guild.id, voiceGroup)
+        if (connection && connection.joinConfig.channelId !== voiceChannel.id) {
+            connection.destroy()
+            connection = null
+        }
+
+        connection ||= joinVoiceChannel({
             channelId: voiceChannel.id,
             guildId: message.guild.id,
-            adapterCreator: message.guild.voiceAdapterCreator,
+            adapterCreator,
             selfDeaf: false,
-            selfMute: false
+            selfMute: false,
+            group: voiceGroup
         })
 
-        await entersState(connection, VoiceConnectionStatus.Ready, 15000)
-        connection.subscribe(state.player)
+        connection.removeAllListeners('debug')
+        connection.removeAllListeners('error')
+        connection.on('debug', (debug) => client.logger?.log?.(`voicechat connection debug: ${debug}`, 'log'))
+        connection.on('error', (err) => client.logger?.log?.(`voicechat connection error: ${err.message}`, 'error'))
 
-        const resource = createAudioResource(generated.outputPath)
+        await entersState(connection, VoiceConnectionStatus.Ready, 60000).catch((err) => {
+            const status = connection.state?.status || 'unknown'
+            throw new Error(`Voice connection did not become ready. Status: ${status}. ${err.message}`)
+        })
+        const subscription = connection.subscribe(state.player)
+        if (!subscription) throw new Error('Discord voice subscription failed.')
+
+        state.player.stop(true)
+        const resource = createAudioResource(generated.outputPath, {
+            inputType: StreamType.Arbitrary,
+            inlineVolume: true
+        })
+        resource.volume?.setVolume(1)
         state.player.play(resource)
-        await entersState(state.player, AudioPlayerStatus.Playing, 15000).catch(() => null)
-        await entersState(state.player, AudioPlayerStatus.Idle, 120000).catch(() => null)
+        await entersState(state.player, AudioPlayerStatus.Playing, 60000).catch((err) => {
+            const status = state.player.state?.status || 'unknown'
+            throw new Error(`Audio player did not start. Status: ${status}. ${err.message}`)
+        })
+        await new Promise((resolve, reject) => {
+            const cleanup = () => {
+                clearTimeout(timer)
+                state.player.off(AudioPlayerStatus.Idle, onIdle)
+                state.player.off('error', onError)
+            }
+            const onIdle = () => {
+                cleanup()
+                resolve()
+            }
+            const onError = (err) => {
+                cleanup()
+                reject(err)
+            }
+            const timer = setTimeout(() => {
+                cleanup()
+                reject(new Error('Voice audio timed out before finishing playback'))
+            }, 120000)
+
+            state.player.once(AudioPlayerStatus.Idle, onIdle)
+            state.player.once('error', onError)
+        })
         return true
     } finally {
         state.busy = false
         if (tempDir) await fs.rm(tempDir, { recursive: true, force: true }).catch(() => null)
     }
 }
+
+global.__akashsuuSpeakVoiceChatReply = speakVoiceChatReply
 
 const buildLocalMemoryMessages = (memory) => {
     return memory.flatMap((entry) => [
@@ -613,20 +679,30 @@ module.exports = async (client) => {
                         systemPrompt: cleanText(`${systemPrompt}\nReply in one short sentence. This reply will be spoken in a voice channel.`)
                     })
 
+                    const replyText = cleanLocalReply(result.reply) || 'Hi.'
+
                     await saveOllamaUsage(client, message.guild.id, { ...result, model })
                     if (!memoryDisabled) {
-                        await saveLocalMemoryTurn(client, message, prompt, result.reply)
+                        await saveLocalMemoryTurn(client, message, prompt, replyText)
                     }
 
                     await message.reply({
-                        content: result.reply,
+                        content: replyText,
                         allowedMentions: { repliedUser: false, parse: [] }
                     }).catch(() => null)
 
-                    const played = await speakVoiceChatReply(client, message, voiceChannel, result.reply)
-                    if (!played) {
+                    try {
+                        const played = await speakVoiceChatReply(client, message, voiceChannel, replyText)
+                        if (!played) {
+                            await message.channel.send({
+                                content: 'I am still speaking the last reply. Try again in a moment.',
+                                allowedMentions: { parse: [] }
+                            }).catch(() => null)
+                        }
+                    } catch (voiceErr) {
+                        client.logger?.log?.(`voicechat speak error: ${voiceErr.stack || voiceErr.message}`, 'error')
                         await message.channel.send({
-                            content: 'I am still speaking the last reply. Try again in a moment.',
+                            content: `I got the local model reply, but voice speaking failed: \`${cleanText(voiceErr.message).slice(0, 180)}\``,
                             allowedMentions: { parse: [] }
                         }).catch(() => null)
                     }

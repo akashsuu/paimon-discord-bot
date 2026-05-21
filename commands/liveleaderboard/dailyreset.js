@@ -99,7 +99,7 @@ async function performReset(client, guildId, type) {
         }
 
         if (type === 'all' || type === 'voice') {
-            const deleteDailyVoiceStmt = client.voice.prepare('DELETE FROM dailyvoice WHERE guildId = ? AND date = ?');
+            const deleteDailyVoiceStmt = client.voiceDb.prepare('DELETE FROM dailyvoice WHERE guildId = ? AND date = ?');
             deleteDailyVoiceStmt.run(guildId, today);
         }
     } catch (err) {

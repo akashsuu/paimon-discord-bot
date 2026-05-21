@@ -144,7 +144,7 @@ async function handleSetup(client, message, args) {
                 `).all(message.guild.id);
                 break;
             case 'voice':
-                aggregatedData = await client.voice.prepare(`
+                aggregatedData = await client.voiceDb.prepare(`
                     SELECT userId, totalVoiceTime AS total 
                     FROM voice 
                     WHERE guildId = ? 
@@ -153,7 +153,7 @@ async function handleSetup(client, message, args) {
                 `).all(message.guild.id);
                 break;
             case 'dailyvoice':
-                aggregatedData = await client.voice.prepare(`
+                aggregatedData = await client.voiceDb.prepare(`
                     SELECT userId, SUM(dailyVoiceTime) AS total 
                     FROM dailyvoice 
                     WHERE guildId = ? 

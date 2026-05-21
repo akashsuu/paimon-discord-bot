@@ -61,7 +61,7 @@ module.exports = async (client) => {
                                     `).all(guildId);
                                     break;
                                 case 'voice':
-                                    leaderboardData = await client.voice.prepare(`
+                                    leaderboardData = await client.voiceDb.prepare(`
                                         SELECT userId, totalVoiceTime AS total 
                                         FROM voice 
                                         WHERE guildId = ? 
@@ -70,7 +70,7 @@ module.exports = async (client) => {
                                     `).all(guildId);
                                     break;
                                 case 'dailyvoice':
-                                    leaderboardData = await client.voice.prepare(`
+                                    leaderboardData = await client.voiceDb.prepare(`
                                         SELECT userId, SUM(dailyVoiceTime) AS total 
                                         FROM dailyvoice 
                                         WHERE guildId = ? 
@@ -124,7 +124,7 @@ module.exports = async (client) => {
                     try {
                         await client.msgs.prepare(`
                             DELETE FROM dailymessages`).run();   
-                        await client.voice.prepare(`
+                        await client.voiceDb.prepare(`
                             DELETE FROM dailyvoice`).run();
                         
                     } catch (err) {
@@ -174,7 +174,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
 
     // If user joins a channel and is not deafened
     if (newState.channelId && oldState.channelId !== newState.channelId && !newState.selfDeaf && !newState.serverDeaf) {
-        await client.voice.prepare(`
+        await client.voiceDb.prepare(`
             INSERT INTO voice (guildId, userId, totalVoiceTime) 
             VALUES (?, ?, 0) 
             ON CONFLICT(guildId, userId) 
@@ -190,14 +190,14 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
         if (joinTime) {
             const duration = currentTime - joinTime;
 
-            await client.voice.prepare(`
+            await client.voiceDb.prepare(`
                 UPDATE voice SET totalVoiceTime = totalVoiceTime + ? 
                 WHERE guildId = ? AND userId = ?
             `).run(duration, guildId, userId);
 
             const today = new Date().toISOString().slice(0, 10);
 
-            await client.voice.prepare(`
+            await client.voiceDb.prepare(`
                 INSERT INTO dailyvoice (guildId, userId, date, dailyVoiceTime)
                 VALUES (?, ?, ?, ?)
                 ON CONFLICT(guildId, userId, date)

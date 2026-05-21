@@ -23,10 +23,10 @@ module.exports = {
                 const today = new Date().toISOString().slice(0, 10);
                 rows = client.msgs.prepare('SELECT userId, SUM(dailyCount) as total FROM dailymessages WHERE guildId = ? AND date = ? GROUP BY userId ORDER BY total DESC').all(guildId, today);
             } else if (type === 'voice') {
-                rows = client.voice.prepare('SELECT userId, SUM(totalVoiceTime) as total FROM voice WHERE guildId = ? GROUP BY userId ORDER BY total DESC').all(guildId);
+                rows = client.voiceDb.prepare('SELECT userId, SUM(totalVoiceTime) as total FROM voice WHERE guildId = ? GROUP BY userId ORDER BY total DESC').all(guildId);
             } else if (type === 'dailyvoice') {
                 const today = new Date().toISOString().slice(0, 10);
-                rows = client.voice.prepare('SELECT userId, SUM(dailyVoiceTime) as total FROM dailyvoice WHERE guildId = ? AND date = ? GROUP BY userId ORDER BY total DESC').all(guildId, today);
+                rows = client.voiceDb.prepare('SELECT userId, SUM(dailyVoiceTime) as total FROM dailyvoice WHERE guildId = ? AND date = ? GROUP BY userId ORDER BY total DESC').all(guildId, today);
             }
 
             // Format leaderboard data

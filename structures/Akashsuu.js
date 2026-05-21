@@ -140,9 +140,9 @@ module.exports = class Akashsuu extends Client {
             UNIQUE(guildId, type)
         );`).run();
         
-            this.voice = new Sql(`${process.cwd()}/Database/voice.db`);
-            this.voice.pragma('journal_mode = WAL');
-            this.voice.prepare(`CREATE TABLE IF NOT EXISTS dailyvoice (
+            this.voiceDb = new Sql(`${process.cwd()}/Database/voice.db`);
+            this.voiceDb.pragma('journal_mode = WAL');
+            this.voiceDb.prepare(`CREATE TABLE IF NOT EXISTS dailyvoice (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 guildId TEXT NOT NULL,
                 userId TEXT NOT NULL,
@@ -151,7 +151,7 @@ module.exports = class Akashsuu extends Client {
                 UNIQUE(guildId, userId, date)
             );`).run();
             
-            this.voice.prepare(`CREATE TABLE IF NOT EXISTS voice (
+            this.voiceDb.prepare(`CREATE TABLE IF NOT EXISTS voice (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 guildId TEXT NOT NULL,
                 userId TEXT NOT NULL,

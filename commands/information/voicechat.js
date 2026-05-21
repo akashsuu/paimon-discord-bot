@@ -15,6 +15,7 @@ module.exports = {
     run: async (client, message, args) => {
         const action = args[0]?.toLowerCase()
         const key = `voice_chatbot_channel_${message.guild.id}`
+        const voiceGroup = `akashsuu-${message.guild.id}`
         const enableActions = ['on', 'enable', 'start', 'set']
         const disableActions = ['off', 'disable', 'stop', 'reset', 'remove']
 
@@ -30,7 +31,7 @@ module.exports = {
 
         if (!action || action === 'status') {
             const channelId = await client.db.get(key)
-            const connection = getVoiceConnection(message.guild.id)
+            const connection = getVoiceConnection(message.guild.id, voiceGroup)
             return message.channel.send({
                 embeds: [
                     client.util.embed()
@@ -45,7 +46,7 @@ module.exports = {
 
         if (disableActions.includes(action)) {
             await client.db.delete(key)
-            const connection = getVoiceConnection(message.guild.id)
+            const connection = getVoiceConnection(message.guild.id, voiceGroup)
             connection?.destroy()
             return message.channel.send({
                 embeds: [
@@ -56,12 +57,63 @@ module.exports = {
             })
         }
 
+        if (action === 'test') {
+            const voiceChannel = message.member?.voice?.channel
+            if (!voiceChannel) {
+                return message.channel.send({
+                    embeds: [
+                        client.util.embed()
+                            .setColor(client.color)
+                            .setDescription(`${client.emoji.cross} | Join a voice channel first, then run \`${message.guild.prefix}voicechat test\`.`)
+                    ]
+                })
+            }
+
+            if (typeof global.__akashsuuSpeakVoiceChatReply !== 'function') {
+                return message.channel.send({
+                    embeds: [
+                        client.util.embed()
+                            .setColor(client.color)
+                            .setDescription(`${client.emoji.cross} | Voice test helper is not loaded yet. Restart the bot and try again.`)
+                    ]
+                })
+            }
+
+            await message.channel.send({
+                embeds: [
+                    client.util.embed()
+                        .setColor(client.color)
+                        .setDescription(`${client.emoji.tick} | Joining ${voiceChannel} and testing voice playback...`)
+                ]
+            })
+
+            try {
+                await global.__akashsuuSpeakVoiceChatReply(client, message, voiceChannel, 'Hello akashsuu. Voice chatbot test is working.')
+                return message.channel.send({
+                    embeds: [
+                        client.util.embed()
+                            .setColor(client.color)
+                            .setDescription(`${client.emoji.tick} | Voice playback test completed.`)
+                    ]
+                })
+            } catch (err) {
+                client.logger?.log?.(`voicechat test error: ${err.stack || err.message}`, 'error')
+                return message.channel.send({
+                    embeds: [
+                        client.util.embed()
+                            .setColor(client.color)
+                            .setDescription(`${client.emoji.cross} | Voice test failed: \`${String(err.message || err).slice(0, 250)}\``)
+                    ]
+                })
+            }
+        }
+
         if (!enableActions.includes(action)) {
             return message.channel.send({
                 embeds: [
                     client.util.embed()
                         .setColor(client.color)
-                        .setDescription(`${client.emoji.cross} | Usage: \`${message.guild.prefix}voicechat enable\`, \`${message.guild.prefix}voicechat enable #channel\`, or \`${message.guild.prefix}voicechat off\`.`)
+                        .setDescription(`${client.emoji.cross} | Usage: \`${message.guild.prefix}voicechat enable\`, \`${message.guild.prefix}voicechat test\`, or \`${message.guild.prefix}voicechat off\`.`)
                 ]
             })
         }
