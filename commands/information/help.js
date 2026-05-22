@@ -23,6 +23,10 @@ module.exports = {
             { label: 'Server Utility', description: 'Leaderboards and server helpers', value: 'serverutility', emoji: client.emoji.serverutillity },
             { label: 'Auto Responder', description: 'Custom automatic replies', value: 'autoresponder', emoji: client.emoji.autoresponder },
             { label: 'Fun', description: 'Games, rates, gifs and chaos', value: 'fun', emoji: client.emoji.fun },
+<<<<<<< HEAD
+=======
+            { label: 'Music', description: 'Lavalink player, queue and voice music', value: 'music', emoji: client.emoji.vc },
+>>>>>>> 40fc381 (added many things)
             { label: 'Verification', description: 'Verify users and protect joins', value: 'verification', emoji: client.emoji.verification },
             { label: 'Join To Create', description: 'Temporary voice channel system', value: 'jointocreate', emoji: client.emoji.jtc },
             { label: 'Voice', description: 'Voice moderation and voice tools', value: 'voice', emoji: client.emoji.vc },

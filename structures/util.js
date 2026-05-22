@@ -559,6 +559,35 @@ module.exports = class Util {
                     .catch((_) => {})
                 return
             }
+<<<<<<< HEAD
+=======
+            if (funny === 'music') {
+                let cmdList = [];
+                interaction.client.commands
+                .filter((cmd) => cmd.category === 'music')
+                .forEach((cmd) => {
+                    if (cmd.subcommand && cmd.subcommand.length) {
+                        cmdList.push(`\`${cmd.name}\``);
+                        cmd.subcommand.forEach((subCmd) => {
+                            cmdList.push(`\`${cmd.name} ${subCmd}\``);
+                        });
+                    } else {
+                        cmdList.push(`\`${cmd.name}\``);
+                    }
+                })
+                embed.addFields({
+                    name: `**${interaction.client.emoji.vc} Music \`[${cmdList.length}]\`**`,
+                    value: cmdList.sort().join(', ') || 'No music commands found.'
+                })
+                interaction
+                    .reply({
+                        embeds: [embed],
+                        ephemeral: true
+                    })
+                    .catch((_) => {})
+                return
+            }
+>>>>>>> 40fc381 (added many things)
             if (funny === 'verification') {
                 let cmdList = [];
                 interaction.client.commands

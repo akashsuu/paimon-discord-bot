@@ -1,15 +1,27 @@
 const axios = require('axios')
 const { AttachmentBuilder } = require('discord.js')
+<<<<<<< HEAD
 const fs = require('fs/promises')
 const os = require('os')
 const path = require('path')
+=======
+const { execFile } = require('child_process')
+const fs = require('fs/promises')
+const os = require('os')
+const path = require('path')
+const { promisify } = require('util')
+>>>>>>> 40fc381 (added many things)
 
 const GROQ_TTS_URL = 'https://api.groq.com/openai/v1/audio/speech'
 const DEFAULT_MODEL = 'canopylabs/orpheus-v1-english'
 const DEFAULT_VOICE = 'hannah'
+<<<<<<< HEAD
 const KOKORO_MODEL_ID = 'onnx-community/Kokoro-82M-v1.0-ONNX'
 const KOKORO_SPEED = 0.55
 let kokoroModelPromise = null
+=======
+const execFileAsync = promisify(execFile)
+>>>>>>> 40fc381 (added many things)
 const VOICE_OPTIONS = {
     girl: 'hannah',
     female: 'hannah',
@@ -18,6 +30,7 @@ const VOICE_OPTIONS = {
     male: 'troy',
     man: 'troy'
 }
+<<<<<<< HEAD
 const KOKORO_VOICE_OPTIONS = {
     girl: 'af_heart',
     female: 'af_heart',
@@ -26,10 +39,16 @@ const KOKORO_VOICE_OPTIONS = {
     male: 'am_adam',
     man: 'am_adam'
 }
+=======
+>>>>>>> 40fc381 (added many things)
 const FALLBACK_TTS = [
     { model: 'canopylabs/orpheus-v1-english', voice: 'hannah' },
     { model: 'canopylabs/orpheus-v1-english', voice: 'troy' }
 ]
+<<<<<<< HEAD
+=======
+const EFFECT_OPTIONS = new Set(['mic', 'radio', 'walkie', 'alien', 'ghost'])
+>>>>>>> 40fc381 (added many things)
 
 const cleanText = (value) => String(value || '').replace(/\s+/g, ' ').trim()
 
@@ -87,6 +106,7 @@ const createSpeech = async ({ apiKey, model, voice, text }) => {
     throw lastError || new Error('Groq TTS failed')
 }
 
+<<<<<<< HEAD
 const createKokoroEnglishSpeech = async ({ text, voice }) => {
     let tts
     try {
@@ -118,11 +138,54 @@ const createKokoroEnglishSpeech = async ({ text, voice }) => {
             model: 'kokoro-js-q8',
             voice
         }
+=======
+const applyAudioEffect = async (audio, effect) => {
+    let ffmpegPath
+    try {
+        ffmpegPath = require('ffmpeg-static')
+    } catch (err) {
+        throw new Error(`ffmpeg-static is not installed: ${err.message}`)
+    }
+
+    if (!ffmpegPath) throw new Error('ffmpeg-static did not provide a binary path')
+
+    const effectFilters = {
+        alien: 'asetrate=44100*1.45,aresample=44100,atempo=0.72,highpass=f=520,lowpass=f=5200,aecho=0.75:0.55:45|95:0.35|0.22,tremolo=f=8:d=0.45,acrusher=bits=9:mode=log:aa=1,volume=1.18',
+        ghost: 'asetrate=44100*0.82,aresample=44100,atempo=1.08,lowpass=f=4200,bass=g=8:f=120,treble=g=-2,acompressor=threshold=-18dB:ratio=3:attack=12:release=120,volume=1.15',
+        mic: 'highpass=f=320,lowpass=f=3200,acompressor=threshold=-22dB:ratio=8:attack=8:release=80,acrusher=bits=10:mode=log:aa=1,volume=1.25',
+        radio: 'highpass=f=320,lowpass=f=3200,acompressor=threshold=-22dB:ratio=8:attack=8:release=80,acrusher=bits=10:mode=log:aa=1,volume=1.25',
+        walkie: 'highpass=f=320,lowpass=f=3200,acompressor=threshold=-22dB:ratio=8:attack=8:release=80,acrusher=bits=10:mode=log:aa=1,volume=1.25'
+    }
+    const filter = effectFilters[effect] || effectFilters.mic
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), `akashsuu-tts-${effect}-`))
+    const inputPath = path.join(tempDir, 'input.wav')
+    const outputPath = path.join(tempDir, `${effect}.wav`)
+
+    try {
+        await fs.writeFile(inputPath, audio)
+        await execFileAsync(ffmpegPath, [
+            '-y',
+            '-i',
+            inputPath,
+            '-af',
+            filter,
+            '-ar',
+            '24000',
+            '-ac',
+            '1',
+            outputPath
+        ], { timeout: 20000 })
+
+        const processed = await fs.readFile(outputPath)
+        if (!processed.length) throw new Error(`${effect} effect returned an empty audio file`)
+        return processed
+>>>>>>> 40fc381 (added many things)
     } finally {
         await fs.rm(tempDir, { recursive: true, force: true }).catch(() => null)
     }
 }
 
+<<<<<<< HEAD
 const createLocalFirstSpeech = async ({ apiKey, model, groqVoice, kokoroVoice, text }) => {
     try {
         return await createKokoroEnglishSpeech({
@@ -148,6 +211,8 @@ const createLocalFirstSpeech = async ({ apiKey, model, groqVoice, kokoroVoice, t
     }
 }
 
+=======
+>>>>>>> 40fc381 (added many things)
 module.exports = {
     name: 'tts',
     aliases: ['speak', 'voice'],
@@ -156,6 +221,7 @@ module.exports = {
     run: async (client, message, args) => {
         const apiKey = process.env.GROQ_API_KEY || client.config.GROQ_API_KEY
         const model = process.env.GROQ_TTS_MODEL || client.config.GROQ_TTS_MODEL || DEFAULT_MODEL
+<<<<<<< HEAD
         const kokoroMode = ['english', 'en', 'kokoro'].includes(args[0]?.toLowerCase())
         if (kokoroMode) args.shift()
         const voiceMode = args[0]?.toLowerCase()
@@ -164,6 +230,17 @@ module.exports = {
         const groqVoice = selectedGroqVoice || process.env.GROQ_TTS_VOICE || client.config.GROQ_TTS_VOICE || DEFAULT_VOICE
         const kokoroVoice = selectedKokoroVoice || 'af_heart'
         if (selectedGroqVoice || selectedKokoroVoice) args.shift()
+=======
+        const apiOnlyMode = ['english', 'en', 'api'].includes(args[0]?.toLowerCase())
+        if (apiOnlyMode) args.shift()
+        const hindiMode = ['hindi', 'hi'].includes(args[0]?.toLowerCase())
+        if (hindiMode) args.shift()
+        const effectMode = EFFECT_OPTIONS.has(args[0]?.toLowerCase()) ? args.shift().toLowerCase() : null
+        const voiceMode = args[0]?.toLowerCase()
+        const selectedGroqVoice = VOICE_OPTIONS[voiceMode]
+        const groqVoice = selectedGroqVoice || process.env.GROQ_TTS_VOICE || client.config.GROQ_TTS_VOICE || DEFAULT_VOICE
+        if (selectedGroqVoice) args.shift()
+>>>>>>> 40fc381 (added many things)
         let text = cleanText(args.join(' '))
 
         if (!text && message.reference?.messageId) {
@@ -176,7 +253,11 @@ module.exports = {
                 embeds: [
                     client.util.embed()
                         .setColor(client.color)
+<<<<<<< HEAD
                         .setDescription(`${client.emoji.cross} | Usage: \`${message.guild.prefix}tts girl hello akashsuu\`, \`${message.guild.prefix}tts boy hello\`, or \`${message.guild.prefix}tts english girl hello akashsuu\`.`)
+=======
+                        .setDescription(`${client.emoji.cross} | Usage: \`${message.guild.prefix}tts girl hello akashsuu\`, \`${message.guild.prefix}tts mic hello\`, \`${message.guild.prefix}tts alien zip zap\`, \`${message.guild.prefix}tts ghost wake up\`, or \`${message.guild.prefix}tts hindi namaste\`.`)
+>>>>>>> 40fc381 (added many things)
                 ]
             })
         }
@@ -192,6 +273,7 @@ module.exports = {
         }
 
         try {
+<<<<<<< HEAD
             const result = kokoroMode
                 ? await createKokoroEnglishSpeech({
                     text,
@@ -204,6 +286,33 @@ module.exports = {
                     kokoroVoice,
                     text
                 })
+=======
+            if (!apiKey) {
+                return message.channel.send({
+                    embeds: [
+                        client.util.embed()
+                            .setColor(client.color)
+                            .setDescription(`${client.emoji.cross} | TTS uses API mode. Add \`GROQ_API_KEY\` to your \`.env\` file and restart the bot.`)
+                    ]
+                })
+            }
+
+            const result = await createSpeech({
+                apiKey,
+                model,
+                voice: groqVoice,
+                text
+            })
+            if (effectMode) {
+                try {
+                    result.audio = await applyAudioEffect(result.audio, effectMode)
+                    result.effect = effectMode
+                } catch (err) {
+                    client.logger?.log?.(`tts ${effectMode} effect skipped: ${err.message}`, 'warn')
+                    result.effect = 'normal fallback'
+                }
+            }
+>>>>>>> 40fc381 (added many things)
             const attachment = new AttachmentBuilder(result.audio, {
                 name: `${makeSafeName(message.author.username)}-tts.${result.extension || 'wav'}`
             })
@@ -211,7 +320,11 @@ module.exports = {
             const embed = client.util.embed()
                 .setColor(client.color)
                 .setTitle('Text To Speech')
+<<<<<<< HEAD
                 .setDescription(`Generated ${kokoroMode ? '**Kokoro local** ' : '**local-first** '}voice for ${message.author}.`)
+=======
+                .setDescription(`Generated ${effectMode === 'alien' ? '**alien** ' : effectMode === 'ghost' ? '**ghost** ' : effectMode ? '**mic-style** ' : hindiMode ? '**Hindi API** ' : '**API** '}voice for ${message.author}.`)
+>>>>>>> 40fc381 (added many things)
                 .addFields(
                     {
                         name: 'Voice',
@@ -222,6 +335,14 @@ module.exports = {
                         name: 'Model',
                         value: `\`${result.model}\``,
                         inline: true
+<<<<<<< HEAD
+=======
+                    },
+                    {
+                        name: 'Effect',
+                        value: `\`${result.effect || 'normal'}\``,
+                        inline: true
+>>>>>>> 40fc381 (added many things)
                     }
                 )
                 .setFooter({
@@ -242,8 +363,11 @@ module.exports = {
                         .setDescription(
                             needsTerms
                                 ? `${client.emoji.cross} | Groq TTS needs model terms accepted first.\nOpen: https://console.groq.com/playground?model=canopylabs%2Forpheus-v1-english`
+<<<<<<< HEAD
                                 : kokoroMode
                                     ? `${client.emoji.cross} | Local Kokoro TTS failed: \`${String(err.message || err).slice(0, 220)}\``
+=======
+>>>>>>> 40fc381 (added many things)
                                 : `${client.emoji.cross} | TTS is **currently down** or the selected voice/model is invalid.`
                         )
                 ]

@@ -1,27 +1,44 @@
 const axios = require('axios')
-<<<<<<< HEAD
-
-const DEFAULT_LOCAL_URL = 'http://127.0.0.1:1234'
-
-const cleanText = (value) => String(value || '').replace(/\s+/g, ' ').trim()
-=======
 const { AttachmentBuilder } = require('discord.js')
 
 const DEFAULT_LOCAL_URL = 'http://127.0.0.1:1234'
-const MAX_EMBED_LESSON_LENGTH = 12000
+const INLINE_CODE_LIMIT = 1800
+
+const LANGUAGE_EXTENSIONS = {
+    js: 'js',
+    javascript: 'js',
+    ts: 'ts',
+    typescript: 'ts',
+    py: 'py',
+    python: 'py',
+    html: 'html',
+    css: 'css',
+    java: 'java',
+    c: 'c',
+    cpp: 'cpp',
+    'c++': 'cpp',
+    cs: 'cs',
+    csharp: 'cs',
+    go: 'go',
+    rust: 'rs',
+    rs: 'rs',
+    php: 'php',
+    lua: 'lua',
+    rb: 'rb',
+    ruby: 'rb',
+    sh: 'sh',
+    bash: 'sh',
+    json: 'json',
+    sql: 'sql'
+}
 
 const cleanText = (value) => String(value || '').replace(/\s+/g, ' ').trim()
-const cleanLessonText = (value) => {
+const cleanCode = (value) => {
     return String(value || '')
-        .replace(/\r\n/g, '\n')
-        .replace(/\r/g, '\n')
-        .split('\n')
-        .map((line) => line.replace(/[ \t]+/g, ' ').trimEnd())
-        .join('\n')
-        .replace(/\n{3,}/g, '\n\n')
+        .replace(/```[a-zA-Z0-9+#-]*\n?/g, '')
+        .replace(/```/g, '')
         .trim()
 }
->>>>>>> 40fc381 (added many things)
 
 const getLocalBaseUrl = (client) => {
     return (
@@ -46,9 +63,7 @@ const getLocalApiHeaders = (client) => {
 
 const extractModelIds = (data) => {
     const models = data?.data || data?.models || []
-    return models
-        .map((model) => model.id || model.name || model.path)
-        .filter(Boolean)
+    return models.map((model) => model.id || model.name || model.path).filter(Boolean)
 }
 
 const getFirstModel = async (client, baseUrl) => {
@@ -68,50 +83,48 @@ const getFirstModel = async (client, baseUrl) => {
         return extractModelIds(response.data)[0] || null
     }
 
-    const response = await axios.get(`${baseUrl}/api/tags`, {
-        timeout: 8000
-    })
+    const response = await axios.get(`${baseUrl}/api/tags`, { timeout: 8000 })
     return response.data?.models?.[0]?.name || null
 }
 
-const buildTeacherMessages = (topic, username) => [
+const parseRequest = (args) => {
+    const first = args[0]?.toLowerCase()
+    const extension = LANGUAGE_EXTENSIONS[first]
+    if (!extension) {
+        return {
+            language: 'text',
+            extension: 'txt',
+            prompt: cleanText(args.join(' '))
+        }
+    }
+
+    return {
+        language: first,
+        extension,
+        prompt: cleanText(args.slice(1).join(' '))
+    }
+}
+
+const buildCodeMessages = ({ language, prompt, username }) => [
     {
         role: 'system',
         content:
-            'You are Akashsuu Teacher, a patient real teacher. Teach step by step in clear English. ' +
-            'Use bullet points as the main format. Avoid long paragraphs. Use clear section headings, numbered steps, examples, common mistakes, and a small recap. ' +
-            'Explain like the student is new but smart. Be detailed, practical, and calm. Do not be too short.'
+            'You are Akashsuu Code Generator. Return only working code. ' +
+            'Do not explain. Do not add markdown fences. Do not add paragraphs before or after the code. ' +
+            'Include helpful code comments only when needed.'
     },
     {
         role: 'user',
         content:
-            `${username} wants to learn: ${topic}\n\n` +
-            'Create a detailed bullet-point lesson. Do not write big paragraphs.\n' +
-            'Use this exact style:\n' +
-            '**Simple Introduction**\n' +
-            '- point\n' +
-            '- point\n\n' +
-            '**What You Need To Know First**\n' +
-            '- point\n' +
-            '- point\n\n' +
-            '**Step-By-Step Teaching**\n' +
-            '1. step with bullet details\n' +
-            '2. step with bullet details\n\n' +
-            '**Important Points**\n' +
-            '- point\n' +
-            '- point\n\n' +
-            '**Example Or Mini Practice**\n' +
-            '- example\n\n' +
-            '**Common Mistakes**\n' +
-            '- mistake and fix\n\n' +
-            '**Quick Recap**\n' +
-            '- recap point'
+            `${username} wants code in ${language}.\n` +
+            `Task: ${prompt}\n\n` +
+            'Generate complete usable code only.'
     }
 ]
 
-const askTeacher = async ({ client, baseUrl, model, topic, username }) => {
+const askCodeModel = async ({ client, baseUrl, model, language, prompt, username }) => {
     const started = Date.now()
-    const messages = buildTeacherMessages(topic, username)
+    const messages = buildCodeMessages({ language, prompt, username })
 
     if (getLocalApiMode(baseUrl) === 'lmstudio') {
         const response = await axios.post(
@@ -119,25 +132,20 @@ const askTeacher = async ({ client, baseUrl, model, topic, username }) => {
             {
                 model,
                 messages,
-                temperature: 0.65,
-                max_tokens: 1200,
+                temperature: 0.25,
+                max_tokens: 1800,
                 stream: false
             },
             {
                 headers: getLocalApiHeaders(client),
-                timeout: 90000
+                timeout: 120000
             }
         )
 
         const reply = response.data?.choices?.[0]?.message?.content || response.data?.message?.content || response.data?.content
         if (!reply) throw new Error('LM Studio API returned an invalid response')
-
         return {
-<<<<<<< HEAD
-            reply: cleanText(reply),
-=======
-            reply: cleanLessonText(reply),
->>>>>>> 40fc381 (added many things)
+            code: cleanCode(reply),
             promptTokens: Number(response.data?.usage?.prompt_tokens) || 0,
             completionTokens: Number(response.data?.usage?.completion_tokens) || 0,
             durationMs: Date.now() - started
@@ -150,24 +158,19 @@ const askTeacher = async ({ client, baseUrl, model, topic, username }) => {
             {
                 model,
                 messages,
-                temperature: 0.65,
-                max_tokens: 1200
+                temperature: 0.25,
+                max_tokens: 1800
             },
             {
                 headers: getLocalApiHeaders(client),
-                timeout: 90000
+                timeout: 120000
             }
         )
 
         const reply = response.data?.choices?.[0]?.message?.content
         if (!reply) throw new Error('Local API returned an invalid response')
-
         return {
-<<<<<<< HEAD
-            reply: cleanText(reply),
-=======
-            reply: cleanLessonText(reply),
->>>>>>> 40fc381 (added many things)
+            code: cleanCode(reply),
             promptTokens: Number(response.data?.usage?.prompt_tokens) || 0,
             completionTokens: Number(response.data?.usage?.completion_tokens) || 0,
             durationMs: Date.now() - started
@@ -181,54 +184,23 @@ const askTeacher = async ({ client, baseUrl, model, topic, username }) => {
             stream: false,
             messages,
             options: {
-                temperature: 0.65,
-                num_predict: 1200
+                temperature: 0.25,
+                num_predict: 1800
             }
         },
         {
-            timeout: 90000
+            timeout: 120000
         }
     )
 
     const reply = response.data?.message?.content
     if (!reply) throw new Error('Ollama returned an invalid response')
-
     return {
-<<<<<<< HEAD
-        reply: cleanText(reply),
-=======
-        reply: cleanLessonText(reply),
->>>>>>> 40fc381 (added many things)
+        code: cleanCode(reply),
         promptTokens: Number(response.data?.prompt_eval_count) || 0,
         completionTokens: Number(response.data?.eval_count) || 0,
         durationMs: Math.round((Number(response.data?.total_duration) || 0) / 1000000)
     }
-}
-
-const splitLesson = (text, maxLength = 3600) => {
-    const chunks = []
-<<<<<<< HEAD
-    let remaining = cleanText(text)
-=======
-    let remaining = cleanLessonText(text)
->>>>>>> 40fc381 (added many things)
-
-    while (remaining.length > maxLength) {
-        let index = remaining.lastIndexOf('\n\n', maxLength)
-        if (index < maxLength * 0.5) index = remaining.lastIndexOf('\n', maxLength)
-        if (index < maxLength * 0.5) index = remaining.lastIndexOf('. ', maxLength)
-        if (index < maxLength * 0.5) index = maxLength
-
-        chunks.push(remaining.slice(0, index).trim())
-        remaining = remaining.slice(index).trim()
-    }
-
-    if (remaining) chunks.push(remaining)
-<<<<<<< HEAD
-    return chunks.slice(0, 4)
-=======
-    return chunks
->>>>>>> 40fc381 (added many things)
 }
 
 const saveUsage = async (client, guildId, usage) => {
@@ -254,44 +226,31 @@ const saveUsage = async (client, guildId, usage) => {
     await client.db.set(key, current)
 }
 
-<<<<<<< HEAD
-=======
-const makeSafeFileName = (topic) => {
-    const slug = cleanText(topic)
+const makeSafeName = (prompt, extension) => {
+    const slug = cleanText(prompt)
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-+|-+$/g, '')
-        .slice(0, 40)
+        .slice(0, 36)
 
-    return `${slug || 'lesson'}-akashsuu-teacher.txt`
+    return `${slug || 'akashsuu-code'}.${extension}`
 }
 
->>>>>>> 40fc381 (added many things)
 module.exports = {
-    name: 'teach',
-    aliases: ['teacher', 'learn', 'lesson'],
+    name: 'code',
+    aliases: ['generatecode', 'coder'],
     category: 'utility',
     premium: true,
     run: async (client, message, args) => {
-        const topic = cleanText(args.join(' '))
         const prefix = message.guild?.prefix || client.config.PREFIX
+        const { language, extension, prompt } = parseRequest(args)
 
-        if (!topic) {
+        if (!prompt) {
             return message.channel.send({
                 embeds: [
                     client.util.embed()
                         .setColor(client.color)
-                        .setDescription(`${client.emoji.cross} | Usage: \`${prefix}teach how to make cake\``)
-                ]
-            })
-        }
-
-        if (topic.length > 250) {
-            return message.channel.send({
-                embeds: [
-                    client.util.embed()
-                        .setColor(client.color)
-                        .setDescription(`${client.emoji.cross} | Keep the lesson topic under **250 characters**.`)
+                        .setDescription(`${client.emoji.cross} | Usage: \`${prefix}code js make a calculator\` or \`${prefix}code python discord bot ping command\``)
                 ]
             })
         }
@@ -303,6 +262,7 @@ module.exports = {
             const model = process.env.LOCAL_CHATBOT_MODEL || process.env.OLLAMA_MODEL || client.config.LOCAL_CHATBOT_MODEL || client.config.OLLAMA_MODEL || await getFirstModel(client, baseUrl)
             if (!model) {
                 return message.channel.send({
+                    content: `${message.author}`,
                     embeds: [
                         client.util.embed()
                             .setColor(client.color)
@@ -311,58 +271,50 @@ module.exports = {
                 })
             }
 
-            const result = await askTeacher({
+            const result = await askCodeModel({
                 client,
                 baseUrl,
                 model,
-                topic,
+                language,
+                prompt,
                 username: message.author.username
             })
 
             await saveUsage(client, message.guild.id, { ...result, model })
 
-<<<<<<< HEAD
-=======
-            if (result.reply.length > MAX_EMBED_LESSON_LENGTH) {
-                const attachment = new AttachmentBuilder(Buffer.from(result.reply, 'utf8'), {
-                    name: makeSafeFileName(topic)
-                })
+            if (!result.code) throw new Error('Local model returned empty code')
 
+            if (result.code.length <= INLINE_CODE_LIMIT) {
                 return message.channel.send({
                     embeds: [
                         client.util.embed()
                             .setColor(client.color)
-                            .setTitle(`Teacher Mode: ${topic.slice(0, 180)}`)
-                            .setDescription(
-                                `The lesson is too detailed for Discord embeds, so I attached the full bullet-point lesson as a text file.\n\n` +
-                                `**Model:** \`${model}\`\n` +
-                                `**Topic:** ${topic}`
-                            )
+                            .setTitle(`Code: ${language}`)
+                            .setDescription(`\`\`\`${extension}\n${result.code}\n\`\`\``)
                             .setFooter({
-                                text: 'akashsuu teacher',
+                                text: `Local model: ${model}`,
                                 iconURL: client.user.displayAvatarURL({ dynamic: true })
                             })
-                    ],
-                    files: [attachment]
+                    ]
                 })
             }
 
->>>>>>> 40fc381 (added many things)
-            const chunks = splitLesson(result.reply)
-            for (let i = 0; i < chunks.length; i += 1) {
-                const embed = client.util.embed()
-                    .setColor(client.color)
-                    .setTitle(i === 0 ? `Teacher Mode: ${topic.slice(0, 180)}` : `Teacher Mode: Continued ${i + 1}/${chunks.length}`)
-                    .setDescription(chunks[i])
-                    .setFooter({
-                        text: `Local model: ${model} | akashsuu teacher`,
-                        iconURL: client.user.displayAvatarURL({ dynamic: true })
-                    })
+            const attachment = new AttachmentBuilder(Buffer.from(result.code, 'utf8'), {
+                name: makeSafeName(prompt, extension)
+            })
 
-                await message.channel.send({ embeds: [embed] })
-            }
+            return message.channel.send({
+                content: `${message.author}`,
+                embeds: [
+                    client.util.embed()
+                        .setColor(client.color)
+                        .setTitle(`Code: ${language}`)
+                        .setDescription(`Generated code is too long for Discord, so I attached it as a file.\n\n**Model:** \`${model}\``)
+                ],
+                files: [attachment]
+            })
         } catch (err) {
-            client.logger?.log?.(`teach error: ${err.response?.data?.error || err.message}`, 'error')
+            client.logger?.log?.(`code command error: ${err.response?.data?.error || err.message}`, 'error')
             const unauthorized = err.response?.status === 401
             return message.channel.send({
                 embeds: [

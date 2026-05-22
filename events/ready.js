@@ -1,4 +1,5 @@
 const { ActivityType } = require('discord.js')
+<<<<<<< HEAD
 const fs = require('fs')
 const path = require('path')
 const axios = require('axios')
@@ -17,10 +18,13 @@ async function resolveAvatar(avatar) {
     if (fs.existsSync(avatarPath)) return fs.readFileSync(avatarPath)
     return avatar
 }
+=======
+>>>>>>> 40fc381 (added many things)
 
 module.exports = async (client) => {
     client.on('ready', async () => {
         console.log(`${client.user.id} is ready.`)
+<<<<<<< HEAD
         const botName = client.config.BOT_NAME || 'akashsuu'
         const botAvatar = client.config.BOT_AVATAR
 
@@ -37,6 +41,8 @@ module.exports = async (client) => {
                 client.logger.log(`Could not update bot avatar: ${error.message}`, 'warn')
             }
         }
+=======
+>>>>>>> 40fc381 (added many things)
 
         client.user.setPresence({
             activities: [
