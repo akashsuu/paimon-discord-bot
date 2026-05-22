@@ -1,0 +1,20 @@
+
+{
+    "BOT_NAME": "akashsuu",
+    "BOT_AVATAR": "",
+    "TOKEN": "",
+    "PREFIX": "!",
+    "MONGO_DB": "",
+    "developer": ["806113872620421140"],
+    "akashsuu" : ["806113872620421140"],
+    "cooldown": true,
+    "owner": ["806113872620421140"],
+    "mainmode": ["806113872620421140"],
+    "premium" : ["806113872620421140"],
+    "admin": ["806113872620421140"],
+    "np": ["806113872620421140"],
+    "invite": "https://discord.com/oauth2/authorize?client_id=848393448942731284&permissions=8&integration_type=0&scope=bot",
+    "support" : "https://discord.gg/64ZptNjsar",
+    "baseText": "```\npaimon!!!```",
+    "extraowner": ["806113872620421140"]
+}
