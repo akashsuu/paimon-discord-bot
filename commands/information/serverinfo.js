@@ -16,8 +16,8 @@ const booster = {
     3: 'Level: 3',
 };
 
-const disabled = '<:akashsuu_crosss:1180470543896551438>';
-const enabled = '<:akashsuu_tick:1180470648053702657>';
+const disabled = '<:akashsuu_cross:1506336272543777019>';
+const enabled = '<:akashsuu_tick:1506342390904918169>';
 
 module.exports = {
     name: 'serverinfo',

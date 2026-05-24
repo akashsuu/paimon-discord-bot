@@ -1,5 +1,5 @@
 const { LavalinkManager } = require('lavalink-client')
-const { formatDuration, musicControls, trackName } = require('../structures/musicUtil')
+const { COMPONENTS_V2_FLAG, formatDuration, musicControls, musicPlayerComponents, trackName } = require('../structures/musicUtil')
 
 const truthy = (value) => ['1', 'true', 'yes', 'on'].includes(String(value || '').toLowerCase())
 const DEFAULT_PUBLIC_NODE = {
@@ -48,6 +48,7 @@ module.exports = async (client) => {
         return
     }
 
+    client.lavalinkNodeOptions = node
     client.lavalink = new LavalinkManager({
         nodes: [node],
         sendToShard: (guildId, payload) => {
@@ -79,17 +80,26 @@ module.exports = async (client) => {
         }
     })
 
-    client.on('raw', (packet) => client.lavalink?.sendRawData(packet))
+    client.on('raw', (packet) => {
+        client.lavalink?.sendRawData(packet).catch((err) => {
+            client.logger?.log?.(`Lavalink raw voice update error: ${err.stack || err.message}`, 'error')
+        })
+    })
 
     client.once('ready', async () => {
-        client.lavalink.options.client.id = client.user.id
-        client.lavalink.options.client.username = client.user.username
+        try {
+            client.lavalink.options.client.id = client.user.id
+            client.lavalink.options.client.username = client.user.username
 
-        await client.lavalink.init({
-            id: client.user.id,
-            username: client.user.username
-        })
-        client.logger?.log?.(`Lavalink node ${node.id} connecting at ${node.host}:${node.port}`, 'ready')
+            await client.lavalink.init({
+                id: client.user.id,
+                username: client.user.username
+            })
+            client.logger?.log?.(`Lavalink node ${node.id} connecting at ${node.host}:${node.port}`, 'ready')
+        } catch (err) {
+            client.lavalinkDisabledReason = `Lavalink startup failed: ${err.message}`
+            client.logger?.log?.(client.lavalinkDisabledReason, 'error')
+        }
     })
 
     client.lavalink.nodeManager.on('connect', (connectedNode) => {
@@ -121,25 +131,14 @@ module.exports = async (client) => {
         const channel = client.channels.cache.get(player.textChannelId)
         if (!channel) return
 
-        const embed = client.util.embed()
-            .setColor(client.color)
-            .setTitle(track.info.title)
-            .setDescription(`**${track.info.author || 'Unknown artist'}**\n${track.info.isStream ? 'Live' : formatDuration(track.info.duration)}`)
-            .addFields(
-                { name: 'Queue', value: `\`${player.queue.tracks.length} waiting\``, inline: true },
-                { name: 'Volume', value: `\`${player.volume}%\``, inline: true },
-                { name: 'Voice', value: player.voiceChannelId ? `<#${player.voiceChannelId}>` : '`unknown`', inline: true }
-            )
-            .setThumbnail(track.info.artworkUrl || client.user.displayAvatarURL({ dynamic: true, size: 512 }))
-            .setFooter({
-                text: 'akashsuu music',
-                iconURL: client.user.displayAvatarURL({ dynamic: true })
-            })
-        if (track.info.uri) embed.setURL(track.info.uri)
-
         channel.send({
-            embeds: [embed],
-            components: musicControls()
+            flags: COMPONENTS_V2_FLAG,
+            components: musicPlayerComponents({
+                track,
+                player,
+                voiceChannelId: player.voiceChannelId,
+                requester: track.requester || 'Now playing'
+            })
         }).catch(() => null)
     })
 
@@ -159,7 +158,14 @@ module.exports = async (client) => {
         }
 
         const memberChannelId = interaction.member?.voice?.channelId
-        if (player.voiceChannelId && memberChannelId && memberChannelId !== player.voiceChannelId) {
+        if (player.voiceChannelId && !memberChannelId) {
+            return interaction.reply({
+                content: `Join <#${player.voiceChannelId}> to control the music.`,
+                ephemeral: true
+            }).catch(() => null)
+        }
+
+        if (player.voiceChannelId && memberChannelId !== player.voiceChannelId) {
             return interaction.reply({
                 content: `Join <#${player.voiceChannelId}> to control the music.`,
                 ephemeral: true
@@ -202,9 +208,10 @@ module.exports = async (client) => {
             }
 
             if (action === 'music_stop') {
+                const stoppedBy = interaction.user
                 await player.destroy('Stopped by music button', true)
                 await interaction.update({ components: musicControls(true) }).catch(() => null)
-                return interaction.followUp({ content: 'Stopped and left voice.', ephemeral: true }).catch(() => null)
+                return interaction.followUp({ content: `Stopped by ${stoppedBy}.`, ephemeral: false }).catch(() => null)
             }
 
             if (action === 'music_queue' || action === 'music_playlists') {
@@ -245,7 +252,27 @@ module.exports = async (client) => {
                     ? Math.min(player.volume + 10, 150)
                     : Math.max(player.volume - 10, 1)
                 await player.setVolume(nextVolume)
-                return interaction.reply({ content: `Volume set to ${nextVolume}%.`, ephemeral: true })
+
+                const current = player.queue.current
+                if (current && interaction.message?.flags?.has?.(COMPONENTS_V2_FLAG)) {
+                    return interaction.update({
+                        flags: COMPONENTS_V2_FLAG,
+                        components: musicPlayerComponents({
+                            track: current,
+                            player,
+                            voiceChannelId: player.voiceChannelId,
+                            requester: current.requester || interaction.user
+                        })
+                    })
+                }
+
+                return interaction.update({
+                    embeds: interaction.message.embeds,
+                    components: musicControls()
+                }).catch(() => interaction.reply({
+                    content: `Volume set to ${nextVolume}%.`,
+                    ephemeral: true
+                }))
             }
         } catch (err) {
             client.logger?.log?.(`music button error: ${err.stack || err.message}`, 'error')
@@ -257,6 +284,12 @@ module.exports = async (client) => {
     })
 
     client.lavalink.on('queueEnd', (player) => {
-        player.destroy('Queue ended', true).catch(() => null)
+        setTimeout(() => {
+            if (!player.playing && !player.queue?.tracks?.length) {
+                player.destroy('Queue ended', true).catch((err) => {
+                    client.logger?.log?.(`music queue destroy error: ${err.message}`, 'warn')
+                })
+            }
+        }, 30000)
     })
 }

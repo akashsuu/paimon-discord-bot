@@ -1,11 +1,10 @@
 const {
     fail,
-    formatDuration,
+    COMPONENTS_V2_FLAG,
     getOrCreatePlayer,
-    musicControls,
+    musicPlayerComponents,
     requireVoice,
     searchTracks,
-    trackName,
     waitForVoiceReady
 } = require('../../structures/musicUtil')
 
@@ -26,6 +25,7 @@ module.exports = {
         try {
             const player = await getOrCreatePlayer(client, message, voiceChannel)
             if (!player) return
+            const shouldStartPlayer = !player.playing && !player.paused
 
             const response = await searchTracks(player, query, message.author)
             if (!response?.tracks?.length) {
@@ -39,32 +39,44 @@ module.exports = {
                 player.queue.add(response.tracks[0])
             }
 
-            if (!player.playing && !player.paused) {
+            if (shouldStartPlayer) {
                 player.setData?.('suppressNextTrackStartMessage', true)
                 await waitForVoiceReady(player)
                 await player.play()
             }
 
-            const firstTrack = isPlaylist ? response.tracks[0] : (player.queue.current || response.tracks[0])
-            const embed = client.util.embed()
+            if (shouldStartPlayer) {
+                const firstTrack = isPlaylist ? response.tracks[0] : (player.queue.current || response.tracks[0])
+
+                return message.channel.send({
+                    flags: COMPONENTS_V2_FLAG,
+                    components: musicPlayerComponents({
+                        track: firstTrack,
+                        player,
+                        voiceChannelId: voiceChannel.id,
+                        requester: message.author,
+                        playlistName: isPlaylist ? response.playlist?.name || 'Playlist added' : null,
+                        playlistSize: isPlaylist ? response.tracks.length : null
+                    })
+                })
+            }
+
+            const queueTitle = isPlaylist ? response.playlist?.name || 'playlist' : response.tracks[0].info.title
+            const queueTrack = response.tracks[0]
+            const queueEmbed = client.util.embed()
                 .setColor(client.color)
-                .setTitle(isPlaylist ? response.playlist?.name || 'Playlist added' : firstTrack.info.title)
                 .setDescription(isPlaylist
-                    ? `Queued **${response.tracks.length}** tracks by ${message.author}.`
-                    : `**${firstTrack.info.author || 'Unknown artist'}**\n${firstTrack.info.isStream ? 'Live' : formatDuration(firstTrack.info.duration)}`)
+                    ? `${client.emoji.tick} | Added **${response.tracks.length}** tracks from **${queueTitle}** to the queue.`
+                    : `${client.emoji.tick} | Added **${queueTitle}** to the queue.`)
                 .addFields(
                     { name: 'Queue', value: `\`${player.queue.tracks.length} waiting\``, inline: true },
-                    { name: 'Voice', value: `<#${voiceChannel.id}>`, inline: true },
-                    { name: 'Volume', value: `\`${player.volume}%\``, inline: true }
+                    { name: 'Requested by', value: `${message.author}`, inline: true }
                 )
-                .setThumbnail(firstTrack.info.artworkUrl || client.user.displayAvatarURL({ dynamic: true, size: 512 }))
-                .setFooter({
-                    text: 'akashsuu music',
-                    iconURL: client.user.displayAvatarURL({ dynamic: true })
-                })
-            if (firstTrack.info.uri) embed.setURL(firstTrack.info.uri)
+                .setThumbnail(queueTrack.info.artworkUrl || client.user.displayAvatarURL({ dynamic: true, size: 512 }))
 
-            return message.channel.send({ embeds: [embed], components: musicControls() })
+            if (queueTrack.info.uri) queueEmbed.setURL(queueTrack.info.uri)
+
+            return message.channel.send({ embeds: [queueEmbed] })
         } catch (err) {
             client.logger?.log?.(`music play error: ${err.stack || err.message}`, 'error')
             const isTimeout = String(err.message || err).toLowerCase().includes('timeout') || err.name === 'TimeoutError'

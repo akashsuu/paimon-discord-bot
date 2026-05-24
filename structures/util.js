@@ -314,6 +314,82 @@ module.exports = class Util {
 
     async selectMenuHandle(interaction) {
         try {
+            const selected = interaction.values?.[0]
+            const groups = {
+                antinuke: { title: 'AntiNuke', emoji: interaction.client.emoji.antinuke, categories: ['security'] },
+                moderation: { title: 'Moderation', emoji: interaction.client.emoji.mod, categories: ['mod'] },
+                automod: { title: 'Automod', emoji: interaction.client.emoji.automod, categories: ['automod'] },
+                logger: { title: 'Logger', emoji: interaction.client.emoji.logs, categories: ['logging'] },
+                utility: { title: 'Utility', emoji: interaction.client.emoji.utillity, categories: ['info', 'utility'] },
+                serverutility: { title: 'Server Utility', emoji: interaction.client.emoji.serverutillity, categories: ['leaderboard'] },
+                autoresponder: { title: 'Auto Responder', emoji: interaction.client.emoji.autoresponder, categories: ['autoresponder'] },
+                fun: { title: 'Fun', emoji: interaction.client.emoji.fun, categories: ['fun'] },
+                music: { title: 'Music', emoji: interaction.client.emoji.vc, categories: ['music'] },
+                verification: { title: 'Verification', emoji: interaction.client.emoji.verification, categories: ['verification'] },
+                jointocreate: { title: 'Join To Create', emoji: interaction.client.emoji.jtc, categories: ['jointocreate'] },
+                voice: { title: 'Voice & TTS', emoji: interaction.client.emoji.vc, categories: ['voice', 'music'], commands: ['tts', 'voicechat'] },
+                customrole: { title: 'Custom Role', emoji: interaction.client.emoji.customrole, categories: ['customrole'] },
+                welcomer: { title: 'Welcomer', emoji: interaction.client.emoji.welcome, categories: ['welcomer'] },
+                sticky: { title: 'Sticky', emoji: interaction.client.emoji.sticky, categories: ['sticky'] },
+                ticket: { title: 'Ticket', emoji: interaction.client.emoji.ticket, categories: ['ticket'] },
+                owner: { title: 'Owner Tools', emoji: interaction.client.emoji.owner || interaction.client.emoji.utillity, categories: ['owner', 'Owner'] }
+            }
+
+            const group = groups[selected]
+            if (group) {
+                const categorySet = new Set(group.categories.map((category) => String(category).toLowerCase()))
+                const cmdList = []
+
+                const commandSet = new Set((group.commands || []).map((command) => String(command).toLowerCase()))
+
+                interaction.client.commands
+                    .filter((cmd) => categorySet.has(String(cmd.category || '').toLowerCase()) || commandSet.has(String(cmd.name || '').toLowerCase()))
+                    .forEach((cmd) => {
+                        if (cmd.subcommand && cmd.subcommand.length) {
+                            cmdList.push(`\`${cmd.name}\``)
+                            cmd.subcommand.forEach((subCmd) => cmdList.push(`\`${cmd.name} ${subCmd}\``))
+                        } else {
+                            cmdList.push(`\`${cmd.name}\``)
+                        }
+                    })
+
+                const sortedCommands = [...new Set(cmdList)].sort((a, b) => a.localeCompare(b))
+                const chunks = []
+                let chunk = ''
+
+                for (const command of sortedCommands) {
+                    const next = chunk ? `${chunk}, ${command}` : command
+                    if (next.length > 950) {
+                        chunks.push(chunk)
+                        chunk = command
+                    } else {
+                        chunk = next
+                    }
+                }
+
+                if (chunk) chunks.push(chunk)
+                if (!chunks.length) chunks.push('No commands found in this category.')
+
+                const embeds = chunks.map((commands, index) => new EmbedBuilder()
+                    .setColor(interaction.client.color)
+                    .setAuthor({
+                        name: `${group.title} Commands`,
+                        iconURL: interaction.client.user.displayAvatarURL()
+                    })
+                    .setThumbnail(interaction.guild.iconURL({ dynamic: true }) || interaction.client.user.displayAvatarURL())
+                    .addFields({
+                        name: index === 0
+                            ? `**${group.emoji} ${group.title} \`[${sortedCommands.length}]\`**`
+                            : `**${group.title} Continued**`,
+                        value: commands
+                    }))
+
+                return interaction.reply({
+                    embeds,
+                    ephemeral: true
+                })
+            }
+
             let options = interaction.values
             const funny = options[0]
             let _commands
