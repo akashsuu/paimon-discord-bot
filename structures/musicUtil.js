@@ -1,6 +1,18 @@
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js')
 
 const URL_REGEX = /^https?:\/\//i
+const COMPONENTS_V2_FLAG = 1 << 15
+const DEFAULT_PUBLIC_NODE = {
+    id: 'serenetia',
+    host: 'lavalinkv4.serenetia.com',
+    port: 443,
+    authorization: 'https://seretia.link/discord',
+    secure: true,
+    requestSignalTimeoutMS: 30000,
+    retryAmount: 5,
+    retryDelay: 10000
+}
+
 const formatDuration = (ms) => {
     if (!ms || !Number.isFinite(ms)) return 'Live'
     const totalSeconds = Math.floor(ms / 1000)
@@ -26,6 +38,11 @@ const trackName = (track) => {
 const requesterName = (track) => {
     const requester = track?.requester
     return requester?.tag || requester?.username || requester?.globalName || 'unknown'
+}
+
+const clampText = (value, max = 1900) => {
+    const text = String(value || '').trim()
+    return text.length > max ? `${text.slice(0, max - 3)}...` : text
 }
 
 const fail = (client, message, description) => {
@@ -62,6 +79,33 @@ const waitForVoiceReady = async (player, timeout = 7000) => {
     }
 
     throw new Error('Voice connection was not ready. Rejoin voice and try again.')
+}
+
+const connectedNodeCount = (lavalink) => {
+    const nodes = lavalink?.nodeManager?.nodes
+    if (!nodes) return 0
+    return Array.from(nodes.values()).filter((node) => node.connected).length
+}
+
+const ensureAvailableNode = async (client) => {
+    const lavalink = client.lavalink
+    if (!lavalink?.nodeManager) return false
+    if (connectedNodeCount(lavalink) > 0) return true
+
+    const nodeManager = lavalink.nodeManager
+    if (!nodeManager.nodes.size) {
+        nodeManager.createNode(client.lavalinkNodeOptions || DEFAULT_PUBLIC_NODE)
+    }
+
+    const nodes = Array.from(nodeManager.nodes.values())
+    for (const node of nodes) {
+        if (node.connected) continue
+        await node.connect().catch((err) => {
+            client.logger?.log?.(`Lavalink reconnect failed (${node.id}): ${err.message}`, 'warn')
+        })
+    }
+
+    return connectedNodeCount(lavalink) > 0
 }
 
 const musicControls = (disabled = false) => [
@@ -128,6 +172,78 @@ const musicControls = (disabled = false) => [
     )
 ]
 
+const musicButton = (customId, label, style = 2, disabled = false) => ({
+    type: 2,
+    custom_id: customId,
+    label,
+    style,
+    disabled
+})
+
+const musicPlayerComponents = ({ track, player, voiceChannelId, requester, disabled = false, playlistName = null, playlistSize = null }) => {
+    const info = track?.info || {}
+    const title = clampText(playlistName || info.title || 'Music Player', 80)
+    const artist = clampText(info.author || 'Unknown artist', 80)
+    const duration = info.isStream ? 'Live' : formatDuration(info.duration)
+    const queueSize = player?.queue?.tracks?.length || 0
+    const volume = player?.volume || 80
+    const thumbnail = info.artworkUrl
+    const requesterText = requester ? `\n-# Requested by ${requester}` : ''
+    const playlistText = playlistSize ? `\nQueued **${playlistSize}** tracks.` : ''
+
+    const children = [
+        {
+            type: 9,
+            components: [
+                {
+                    type: 10,
+                    content: clampText([
+                        `## ${title}`,
+                        `**${artist}**`,
+                        `\`${duration}\` | \`${queueSize} waiting\` | \`${volume}% volume\`${voiceChannelId ? ` | <#${voiceChannelId}>` : ''}`,
+                        playlistText,
+                        requesterText
+                    ].filter(Boolean).join('\n'))
+                }
+            ],
+            accessory: thumbnail
+                ? {
+                    type: 11,
+                    media: { url: thumbnail },
+                    description: title
+                }
+                : musicButton('music_pause', 'Pause', 2, disabled)
+        },
+        {
+            type: 1,
+            components: [
+                musicButton('music_shuffle', 'Shuffle', 2, disabled),
+                musicButton('music_previous', 'Back', 2, disabled),
+                musicButton('music_pause', 'Pause', 1, disabled),
+                musicButton('music_skip', 'Skip', 2, disabled),
+                musicButton('music_queue', 'Queue', 2, disabled)
+            ]
+        },
+        {
+            type: 1,
+            components: [
+                musicButton('music_voldown', 'Vol -', 2, disabled),
+                musicButton('music_volup', 'Vol +', 2, disabled),
+                musicButton('music_settings', 'Settings', 2, disabled),
+                musicButton('music_stop', 'Stop', 4, disabled)
+            ]
+        }
+    ]
+
+    return [
+        {
+            type: 17,
+            accent_color: 0xffffff,
+            components: children
+        }
+    ]
+}
+
 const requireLavalink = (client, message) => {
     if (!client.lavalink) {
         fail(client, message, client.lavalinkDisabledReason || 'Lavalink is not configured.')
@@ -186,6 +302,12 @@ const getOrCreatePlayer = async (client, message, voiceChannel) => {
     const lavalink = requireLavalink(client, message)
     if (!lavalink) return null
 
+    const hasNode = await ensureAvailableNode(client)
+    if (!hasNode) {
+        fail(client, message, 'No Lavalink node is connected right now. Restart the bot or try again in a minute.')
+        return null
+    }
+
     const player = lavalink.createPlayer({
         guildId: message.guild.id,
         voiceChannelId: voiceChannel.id,
@@ -231,7 +353,9 @@ module.exports = {
     fail,
     formatDuration,
     getOrCreatePlayer,
+    COMPONENTS_V2_FLAG,
     musicControls,
+    musicPlayerComponents,
     ok,
     requesterName,
     requireLavalink,
@@ -241,5 +365,6 @@ module.exports = {
     searchTracks,
     trackName,
     trackTitle,
+    ensureAvailableNode,
     waitForVoiceReady
 }

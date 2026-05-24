@@ -1,6 +1,10 @@
 const axios = require('axios')
-const { ActionRowBuilder, AttachmentBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js')
-const { createCanvas } = require('canvas')
+const { AttachmentBuilder, ComponentType } = require('discord.js')
+
+const COMPONENTS_V2_FLAG = 1 << 15
+const GROQ_TTS_URL = 'https://api.groq.com/openai/v1/audio/speech'
+const DEFAULT_TTS_MODEL = 'canopylabs/orpheus-v1-english'
+const DEFAULT_TTS_VOICE = 'hannah'
 
 const languageNames = {
     auto: 'Auto Detect',
@@ -30,124 +34,14 @@ const languageNames = {
 }
 
 const cleanText = (value) => String(value || '').replace(/\s+/g, ' ').trim()
-
-const roundRect = (ctx, x, y, width, height, radius) => {
-    ctx.beginPath()
-    ctx.moveTo(x + radius, y)
-    ctx.lineTo(x + width - radius, y)
-    ctx.quadraticCurveTo(x + width, y, x + width, y + radius)
-    ctx.lineTo(x + width, y + height - radius)
-    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height)
-    ctx.lineTo(x + radius, y + height)
-    ctx.quadraticCurveTo(x, y + height, x, y + height - radius)
-    ctx.lineTo(x, y + radius)
-    ctx.quadraticCurveTo(x, y, x + radius, y)
-    ctx.closePath()
-}
-
-const wrapText = (ctx, text, maxWidth, maxLines) => {
-    const words = text.split(/\s+/)
-    const lines = []
-    let line = ''
-
-    for (const word of words) {
-        const next = line ? `${line} ${word}` : word
-        if (ctx.measureText(next).width > maxWidth && line) {
-            lines.push(line)
-            line = word
-        } else {
-            line = next
-        }
-
-        if (lines.length === maxLines) break
-    }
-
-    if (line && lines.length < maxLines) lines.push(line)
-    if (words.length && lines.length === maxLines && words.join(' ').length > lines.join(' ').length) {
-        lines[maxLines - 1] = `${lines[maxLines - 1].replace(/\.*$/, '')}...`
-    }
-
-    return lines
-}
-
-const drawPanelText = (ctx, { label, language, text, x, y, width, height, accent }) => {
-    ctx.fillStyle = '#ffffff'
-    roundRect(ctx, x, y, width, height, 18)
-    ctx.fill()
-
-    ctx.fillStyle = accent
-    roundRect(ctx, x, y, width, 58, 18)
-    ctx.fill()
-    ctx.fillRect(x, y + 28, width, 30)
-
-    ctx.font = '700 24px "Segoe UI", Arial'
-    ctx.fillStyle = '#ffffff'
-    ctx.fillText(label, x + 26, y + 38)
-
-    ctx.font = '600 20px "Segoe UI", Arial'
-    ctx.fillStyle = '#5f6368'
-    ctx.fillText(language, x + 26, y + 92)
-
-    ctx.font = '29px "Segoe UI", Arial'
-    ctx.fillStyle = '#202124'
-    const lines = wrapText(ctx, text, width - 52, 5)
-    lines.forEach((line, index) => {
-        ctx.fillText(line, x + 26, y + 138 + index * 42)
-    })
-}
-
-const createTranslateImage = ({ sourceText, translatedText, detectedLanguage }) => {
-    const canvas = createCanvas(1180, 600)
-    const ctx = canvas.getContext('2d')
-
-    ctx.fillStyle = '#f8fafd'
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
-
-    ctx.fillStyle = '#4285f4'
-    roundRect(ctx, 44, 36, 1092, 96, 24)
-    ctx.fill()
-
-    ctx.font = '700 38px "Segoe UI", Arial'
-    ctx.fillStyle = '#ffffff'
-    ctx.fillText('Language Trans', 84, 96)
-
-    ctx.font = '600 22px "Segoe UI", Arial'
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.92)'
-    ctx.fillText(`${getLanguageName(detectedLanguage)} -> English`, 842, 96)
-
-    ctx.fillStyle = 'rgba(60, 64, 67, 0.16)'
-    roundRect(ctx, 45, 160, 1090, 358, 22)
-    ctx.fill()
-
-    drawPanelText(ctx, {
-        label: 'Original',
-        language: getLanguageName(detectedLanguage),
-        text: sourceText,
-        x: 64,
-        y: 148,
-        width: 514,
-        height: 350,
-        accent: '#1a73e8'
-    })
-
-    drawPanelText(ctx, {
-        label: 'English',
-        language: 'Translation',
-        text: translatedText,
-        x: 602,
-        y: 148,
-        width: 514,
-        height: 350,
-        accent: '#34a853'
-    })
-
-    ctx.font = '600 22px "Segoe UI", Arial'
-    ctx.fillStyle = '#5f6368'
-    ctx.fillText('akashsuu translator', 64, 558)
-    ctx.fillStyle = '#1a73e8'
-    ctx.fillText('Auto detected language', 848, 558)
-
-    return canvas.toBuffer('image/png')
+const stripMentions = (value) => cleanText(String(value || '')
+    .replace(/<@!?\d{15,25}>/g, '')
+    .replace(/<@&\d{15,25}>/g, '')
+    .replace(/<#\d{15,25}>/g, '')
+    .replace(/@\S+/g, ''))
+const clampText = (value, max = 1900) => {
+    const text = String(value || '').trim()
+    return text.length > max ? `${text.slice(0, max - 3)}...` : text
 }
 
 const getLanguageName = (code) => {
@@ -184,13 +78,81 @@ const translateToEnglish = async (text) => {
     }
 }
 
+const createSpeech = async ({ apiKey, model, voice, text }) => {
+    const response = await axios.post(
+        GROQ_TTS_URL,
+        {
+            model,
+            input: text,
+            voice,
+            response_format: 'wav'
+        },
+        {
+            headers: {
+                Authorization: `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
+            },
+            responseType: 'arraybuffer',
+            timeout: 30000
+        }
+    )
+
+    if (!response.data || !Buffer.byteLength(response.data)) {
+        throw new Error('Groq TTS returned an empty audio response')
+    }
+
+    return Buffer.from(response.data)
+}
+
+const translateComponents = ({ sourceText, translatedText, detectedLanguage, hasAudio, ttsDisabled = false }) => {
+    const audioLine = hasAudio
+        ? '\n-# Audio translation attached below.'
+        : '\n-# Add `GROQ_API_KEY` to enable WAV audio translation.'
+
+    const children = [
+        {
+            type: 10,
+            content: clampText([
+                '## Language Trans',
+                `**Detected:** ${getLanguageName(detectedLanguage)} -> English`,
+                '',
+                `**Original**\n${sourceText}`,
+                '',
+                `**English**\n${translatedText}`,
+                audioLine
+            ].join('\n'))
+        }
+    ]
+
+    children.push({
+        type: 1,
+        components: [
+            {
+                type: 2,
+                custom_id: 'tr_tts',
+                label: 'Speak in Chat',
+                style: 2,
+                disabled: ttsDisabled
+            }
+        ]
+    })
+
+    return [
+        {
+            type: 17,
+            accent_color: 0xffffff,
+            components: children
+        }
+    ]
+}
+
 module.exports = {
     name: 'translator',
     aliases: ['tr', 'translate'],
     category: 'utility',
     premium: true,
     run: async (client, message, args) => {
-        let text = cleanText(args.join(' '))
+        let text = stripMentions(args.join(' '))
 
         if (!text && message.reference?.messageId) {
             const replied = await message.channel.messages.fetch(message.reference.messageId).catch(() => null)
@@ -219,31 +181,37 @@ module.exports = {
 
         try {
             const result = await translateToEnglish(text)
-            const image = createTranslateImage({
-                sourceText: text,
-                translatedText: result.translated,
-                detectedLanguage: result.detectedLanguage
-            })
-            const attachment = new AttachmentBuilder(image, {
-                name: 'translation.png'
-            })
-            const embed = client.util.embed()
-                .setColor(client.color)
-                .setTitle('Language Trans')
-                .setImage('attachment://translation.png')
-                .setFooter({
-                    text: 'akashsuu translator',
-                    iconURL: client.user.displayAvatarURL({ dynamic: true })
-                })
+            const files = []
+            const apiKey = process.env.GROQ_API_KEY || client.config.GROQ_API_KEY
+            let hasAudio = false
 
-            const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId('tr_tts')
-                    .setLabel('TTS')
-                    .setStyle(ButtonStyle.Secondary)
-            )
+            if (apiKey) {
+                try {
+                    const audio = await createSpeech({
+                        apiKey,
+                        model: process.env.GROQ_TTS_MODEL || client.config.GROQ_TTS_MODEL || DEFAULT_TTS_MODEL,
+                        voice: process.env.GROQ_TTS_VOICE || client.config.GROQ_TTS_VOICE || DEFAULT_TTS_VOICE,
+                        text: result.translated
+                    })
+                    files.push(new AttachmentBuilder(audio, {
+                        name: 'translation.wav'
+                    }))
+                    hasAudio = true
+                } catch (err) {
+                    client.logger?.log?.(`translator wav tts failed: ${err.response?.data?.toString?.() || err.message}`, 'warn')
+                }
+            }
 
-            const sent = await message.channel.send({ embeds: [embed], files: [attachment], components: [row] })
+            const sent = await message.channel.send({
+                flags: COMPONENTS_V2_FLAG,
+                components: translateComponents({
+                    sourceText: text,
+                    translatedText: result.translated,
+                    detectedLanguage: result.detectedLanguage,
+                    hasAudio
+                }),
+                files
+            })
             let ttsUses = 0
             const collector = sent.createMessageComponentCollector({
                 componentType: ComponentType.Button,
@@ -267,15 +235,20 @@ module.exports = {
             })
 
             collector.on('end', async () => {
-                const disabledRow = new ActionRowBuilder().addComponents(
-                    ButtonBuilder.from(row.components[0]).setDisabled(true)
-                )
-
-                await sent.edit({ components: [disabledRow] }).catch(() => null)
+                await sent.edit({
+                    components: translateComponents({
+                        sourceText: text,
+                        translatedText: result.translated,
+                        detectedLanguage: result.detectedLanguage,
+                        hasAudio,
+                        ttsDisabled: true
+                    })
+                }).catch(() => null)
             })
 
             return sent
         } catch (err) {
+            client.logger?.log?.(`translator error: ${err.stack || err.message}`, 'error')
             return message.channel.send({
                 embeds: [
                     client.util.embed()

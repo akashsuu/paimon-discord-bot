@@ -22,7 +22,7 @@ const FALLBACK_TTS = [
     { model: 'canopylabs/orpheus-v1-english', voice: 'hannah' },
     { model: 'canopylabs/orpheus-v1-english', voice: 'troy' }
 ]
-const EFFECT_OPTIONS = new Set(['mic', 'radio', 'walkie', 'alien', 'ghost'])
+const EFFECT_OPTIONS = new Set(['mic', 'radio', 'walkie', 'alien', 'ghost', 'man', 'moan'])
 
 const cleanText = (value) => String(value || '').replace(/\s+/g, ' ').trim()
 
@@ -93,6 +93,8 @@ const applyAudioEffect = async (audio, effect) => {
     const effectFilters = {
         alien: 'asetrate=44100*1.45,aresample=44100,atempo=0.72,highpass=f=520,lowpass=f=5200,aecho=0.75:0.55:45|95:0.35|0.22,tremolo=f=8:d=0.45,acrusher=bits=9:mode=log:aa=1,volume=1.18',
         ghost: 'asetrate=44100*0.82,aresample=44100,atempo=1.08,lowpass=f=4200,bass=g=8:f=120,treble=g=-2,acompressor=threshold=-18dB:ratio=3:attack=12:release=120,volume=1.15',
+        man: 'asetrate=44100*0.86,aresample=44100,atempo=1.06,highpass=f=90,lowpass=f=6200,bass=g=10:f=120,treble=g=2:f=3200,acompressor=threshold=-24dB:ratio=6:attack=6:release=90,loudnorm=I=-15:TP=-1.5:LRA=8,volume=1.2',
+        moan: 'asetrate=44100*0.92,aresample=44100,atempo=1.04,highpass=f=120,lowpass=f=3600,bass=g=5:f=180,treble=g=-3,acompressor=threshold=-28dB:ratio=5:attack=20:release=180,tremolo=f=3.5:d=0.16,volume=1.12',
         mic: 'highpass=f=320,lowpass=f=3200,acompressor=threshold=-22dB:ratio=8:attack=8:release=80,acrusher=bits=10:mode=log:aa=1,volume=1.25',
         radio: 'highpass=f=320,lowpass=f=3200,acompressor=threshold=-22dB:ratio=8:attack=8:release=80,acrusher=bits=10:mode=log:aa=1,volume=1.25',
         walkie: 'highpass=f=320,lowpass=f=3200,acompressor=threshold=-22dB:ratio=8:attack=8:release=80,acrusher=bits=10:mode=log:aa=1,volume=1.25'
@@ -137,11 +139,14 @@ module.exports = {
         if (apiOnlyMode) args.shift()
         const hindiMode = ['hindi', 'hi'].includes(args[0]?.toLowerCase())
         if (hindiMode) args.shift()
-        const effectMode = EFFECT_OPTIONS.has(args[0]?.toLowerCase()) ? args.shift().toLowerCase() : null
+        let effectMode = EFFECT_OPTIONS.has(args[0]?.toLowerCase()) ? args.shift().toLowerCase() : null
         const voiceMode = args[0]?.toLowerCase()
         const selectedGroqVoice = VOICE_OPTIONS[voiceMode]
         const groqVoice = selectedGroqVoice || process.env.GROQ_TTS_VOICE || client.config.GROQ_TTS_VOICE || DEFAULT_VOICE
-        if (selectedGroqVoice) args.shift()
+        if (selectedGroqVoice) {
+            if (voiceMode === 'man' && !effectMode) effectMode = 'man'
+            args.shift()
+        }
         let text = cleanText(args.join(' '))
 
         if (!text && message.reference?.messageId) {
@@ -154,7 +159,7 @@ module.exports = {
                 embeds: [
                     client.util.embed()
                         .setColor(client.color)
-                        .setDescription(`${client.emoji.cross} | Usage: \`${message.guild.prefix}tts girl hello akashsuu\`, \`${message.guild.prefix}tts mic hello\`, \`${message.guild.prefix}tts alien zip zap\`, \`${message.guild.prefix}tts ghost wake up\`, or \`${message.guild.prefix}tts hindi namaste\`.`)
+                        .setDescription(`${client.emoji.cross} | Usage: \`${message.guild.prefix}tts girl hello akashsuu\`, \`${message.guild.prefix}tts man hello\`, \`${message.guild.prefix}tts moan tired...\`, \`${message.guild.prefix}tts ghost wake up\`, or \`${message.guild.prefix}tts hindi namaste\`.`)
                 ]
             })
         }
@@ -202,7 +207,7 @@ module.exports = {
             const embed = client.util.embed()
                 .setColor(client.color)
                 .setTitle('Text To Speech')
-                .setDescription(`Generated ${effectMode === 'alien' ? '**alien** ' : effectMode === 'ghost' ? '**ghost** ' : effectMode ? '**mic-style** ' : hindiMode ? '**Hindi API** ' : '**API** '}voice for ${message.author}.`)
+                .setDescription(`Generated ${effectMode === 'alien' ? '**alien** ' : effectMode === 'ghost' ? '**ghost** ' : effectMode === 'man' ? '**man announcer** ' : effectMode === 'moan' ? '**dramatic groan** ' : effectMode ? '**mic-style** ' : hindiMode ? '**Hindi API** ' : '**API** '}voice for ${message.author}.`)
                 .addFields(
                     {
                         name: 'Voice',
