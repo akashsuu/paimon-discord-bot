@@ -11,7 +11,7 @@ module.exports = async (client) => {
                 const antinuke = await client.db?.get(
                     `${audit.target?.guild?.id}_antinuke`
                 )  
-                if (antinuke?.antinuke !== true && antinuke?.antiautomodruledelete) return
+                if (antinuke?.antinuke !== true || antinuke?.antiautomodruleupdate !== true) return
                 if (data) {
                     if (data.serverup) return
                 }

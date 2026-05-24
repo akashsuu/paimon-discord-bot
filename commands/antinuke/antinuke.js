@@ -6,10 +6,10 @@ module.exports = {
     aliases: ['antiwizz', 'an'],
     category: 'security',
     subcommand: [
-        'enable', 'disable', 'antiban', 'antiunban', 'antikick', 'antibotadd', 'antichannelcreate', 
+        'enable', 'disable', 'status', 'antiban', 'antiunban', 'antikick', 'antibotadd', 'antichannelcreate', 
         'antichanneldelete', 'antichannelupdate', 'antiemojicreate', 'antiemojidelete', 'antiemojiupdate', 
         'antieveryone', 'antirolecreate', 'antiroledelete', 'antiroleupdate', 'antimemberupdate', 
-        'antintegration', 'antisrverupdate', 'antiautomodrulecreate', 'antiautomodruleupdate', 
+        'antintegration', 'antisrverupdate', 'antiserverupdate', 'antiautomodrulecreate', 'antiautomodruleupdate', 
         'antiautomodruledelete', 'antiguildeventcreate', 'antiguildeventupdate', 'antiguildeventdelete', 
         'antiwebhookcreate', 'antiwebhookdelete', 'antiwebhookupdate', 'antistickercreate', 
         'antistickerdelete', 'antistickerupdate', 'antiprune'
@@ -125,7 +125,7 @@ module.exports = {
                 },
                 {
                     name: `__**Antinuke Server**__`,
-                    value: `\`${prefix}antinuke antisrverupdate\`\n\`${prefix}antinuke antiprune\`\n\`${prefix}antinuke antiautomodrulecreate\`\n\`${prefix}antinuke antiautomodruleupdate\`\n\`${prefix}antinuke antiautomodruledelete\`\n\`${prefix}antinuke antiguildeventcreate\`\n\`${prefix}antinuke antiguildeventupdate\`\n\`${prefix}antinuke antiguildeventdelete\``
+                    value: `\`${prefix}antinuke antiserverupdate\`\n\`${prefix}antinuke antiprune\`\n\`${prefix}antinuke antiautomodrulecreate\`\n\`${prefix}antinuke antiautomodruleupdate\`\n\`${prefix}antinuke antiautomodruledelete\`\n\`${prefix}antinuke antiguildeventcreate\`\n\`${prefix}antinuke antiguildeventupdate\`\n\`${prefix}antinuke antiguildeventdelete\``
                 },
                 {
                     name: `__**Antinuke Everyone**__`,
@@ -251,7 +251,7 @@ module.exports = {
                         )
                      ]})
                     await client.db.get(`${message.guild.id}_wl`).then(async (data) => {
-                        const users = data.whitelisted;
+                        const users = Array.isArray(data?.whitelisted) ? data.whitelisted : [];
                         for (let i = 0; i < users.length; i++) {
                             let data2 = await client.db.get(`${message.guild.id}_${users[i]}_wl`);
                             if (data2) {
@@ -310,12 +310,13 @@ module.exports = {
                         ]
                     });
                 }
-                if (featureOptions.includes(option)) {
-                    antinukeData[option] = !antinukeData[option];
+                const normalizedOption = option === 'antiserverupdate' ? 'antisrverupdate' : option;
+                if (featureOptions.includes(normalizedOption)) {
+                    antinukeData[normalizedOption] = !antinukeData[normalizedOption];
                     await client.db.set(`${message.guild.id}_antinuke`, antinukeData);
 
-                    const status = antinukeData[option] ? enable : disable;
-                    const feature = option.replace(/anti/g, 'antinuke anti');
+                    const status = antinukeData[normalizedOption] ? enable : disable;
+                    const feature = normalizedOption.replace(/anti/g, 'antinuke anti');
                     message.channel.send({
                         embeds: [
                             client.util.embed()

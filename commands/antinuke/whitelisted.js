@@ -55,19 +55,7 @@ module.exports = {
                     await client.db.set(`${message.guild.id}_wl`, {
                         whitelisted: []
                     })
-                    let users = data.whitelisted
-                    let i
-                    for (i = 0; i < users.length; i++) {
-                        let data2 = await client.db?.get(
-                            `${message.guild.id}_${users[i]}_wl`
-                        )
-                        if (data2) {
-                            client.db?.delete(
-                                `${message.guild.id}_${users[i]}_wl`
-                            )
-                        }
-                    }
-                    message.channel.send({
+                    return message.channel.send({
                         embeds: [
                             client.util.embed()
                                 .setColor(client.color)
@@ -77,7 +65,7 @@ module.exports = {
                         ]
                     })
                 } else {
-                    const users = data.whitelisted
+                    const users = Array.isArray(data.whitelisted) ? data.whitelisted : []
                     const mentions = []
                     if (users.length !== 0) {
                         users.forEach((userId) =>

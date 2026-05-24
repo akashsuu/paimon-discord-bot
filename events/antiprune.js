@@ -9,7 +9,7 @@ module.exports = async (client) => {
       .then(async (data) => {
       const antinuke = await client.db?.get(`${guild?.id}_antinuke`)
       if (audit.action === AuditLogEvent.MemberPrune) {
-      if (antinuke.antinuke !== true && !antinuke.antiprune) return
+      if (antinuke?.antinuke !== true || antinuke?.antiprune !== true) return
       if (data) {
           if (data.prune) return
        }

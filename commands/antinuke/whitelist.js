@@ -302,7 +302,7 @@ To enable use antinuke enable ** `)
             }
             
             const collector = msg.createMessageComponentCollector({
-                filter: (i) => (i.isStringSelectMenu() || i.isButton) && i.user,
+                filter: (i) => (i.isStringSelectMenu() || i.isButton()) && i.user,
                 time: 60000
             })
             collector.on('collect', async (i) => {

@@ -13,7 +13,7 @@ module.exports = async (client) => {
 
             const isWhitelisted = await client.db.get(`${ban.guild.id}_${executor.id}_wl`);
             const antinukeEnabled = await client.db.get(`${ban.guild.id}_antinuke`);
-            if (!antinukeEnabled && !antinukeEnabled?.antiban) return;
+            if (antinukeEnabled?.antinuke !== true || antinukeEnabled?.antiban !== true) return;
             if (isWhitelisted?.ban || executor.id === ban.guild.ownerId || executor.id === client.user.id) return;
 
             const panicMode = await client.db.get(`panic_${ban.guild.id}`);

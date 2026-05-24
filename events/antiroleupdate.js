@@ -11,13 +11,13 @@ module.exports = async (client) => {
         const logs = auditLogs?.entries?.first()
         if (!logs) return
         const { executor, target, createdTimestamp } = logs
-        let = difference = Date.now() - createdTimestamp
+        const difference = Date.now() - createdTimestamp
         if (difference > 3600000) return
         await client.db
             ?.get(`${o.guild.id}_${executor?.id}_wl`)
             .then(async (data) => {
                 const antinuke = await client.db.get(`${o.guild.id}_antinuke`)
-                if (antinuke.antinuke !== true && !antinuke.antiroleupdate) return
+                if (antinuke?.antinuke !== true || antinuke?.antiroleupdate !== true) return
                 if (data) {
                     if (data.rlup) return
                 }

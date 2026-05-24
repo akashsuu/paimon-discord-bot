@@ -17,12 +17,13 @@ module.exports = async (client) => {
     };
 
     client.on(Events.MessageCreate, async (message) => {
+        if (!message.guild || message.author?.bot) return;
         if (!message.mentions.everyone) return;
         try {
             // Fetch antinuke data from cache or DB
             const antinuke = await fetchFromCacheOrDB(`antinuke_${message.guild.id}`, `${message.guild.id}_antinuke`);
             const whitelistData = await client.db?.get(`${message.guild.id}_${message.author.id}_wl`);
-            if (!antinuke || !antinuke.antieveryone || (whitelistData && whitelistData.meneve)) return;
+            if (antinuke?.antinuke !== true || antinuke?.antieveryone !== true || (whitelistData && whitelistData.meneve)) return;
 
             if (message.author.id === message.guild.ownerId || message.author.id === client.user.id) return;
 

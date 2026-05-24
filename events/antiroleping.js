@@ -23,7 +23,7 @@ module.exports = async (client) => {
                     const antinuke = await client.db.get(
                         `${message?.guild?.id}_antinuke`
                     )
-                    if (antinuke.antinuke !== true && !antinuke.antieveryone) return
+                    if (antinuke?.antinuke !== true || antinuke?.antieveryone !== true) return
                     if (data) {
                         if (data.meneve) return
                     }

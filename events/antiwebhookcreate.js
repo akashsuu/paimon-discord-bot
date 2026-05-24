@@ -11,7 +11,7 @@ module.exports = async (client) => {
         const logs = auditLogs?.entries?.first()
         if (!logs) return
         const { executor, target, createdTimestamp } = logs
-        let = difference = Date.now() - createdTimestamp
+        const difference = Date.now() - createdTimestamp
         if (difference > 3600000) return
         await client.db
             ?.get(`${webhook.guild.id}_${executor?.id}_wl`)
@@ -19,7 +19,7 @@ module.exports = async (client) => {
                 const antinuke = await client.db.get(
                     `${webhook.guild.id}_antinuke`
                 )
-                if (antinuke.antinuke !== true && !antinuke.antiwebhookcreate) return
+                if (antinuke?.antinuke !== true || antinuke?.antiwebhookcreate !== true) return
                 if (data) {
                     if (data.mngweb) return
                 }

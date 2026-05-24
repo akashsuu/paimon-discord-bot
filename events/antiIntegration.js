@@ -7,7 +7,7 @@ module.exports = async (client) => {
             if (check.includes(guild.id)) return;
             const { executorId, target } = audit;
             const antinukeEnabled = await client.db.get(`${guild.id}_antinuke`);
-            if (!antinukeEnabled && !antinukeEnabled.antibotadd) return;
+            if (antinukeEnabled?.antinuke !== true || antinukeEnabled?.antintegration !== true) return;
             const isWhitelisted = await client.db.get(`${guild.id}_${executorId}_wl`);
             if (isWhitelisted?.botadd || executorId === guild.ownerId || executorId === client.user.id) return
             try {

@@ -65,7 +65,7 @@ module.exports = {
                         ]
                     })
                 } else {
-                    const users = data.whitelisted
+                    const users = Array.isArray(data.whitelisted) ? data.whitelisted : []
                     const mentions = []
                     if (users.length !== 0) {
                         await client.db.set(`${message.guild.id}_wl`, {
