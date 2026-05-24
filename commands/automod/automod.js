@@ -718,7 +718,7 @@ const buttonCollector = sentMessage.createMessageComponentCollector({ filter: bu
 buttonCollector.on('collect', async interaction => {
     if (interaction.user.id !== message.author.id) return interaction.editReply({ content: `You are not allowed to interact with these buttons.`, ephemeral: true });
     const category = interaction.customId.split('_')[1];
-    const entries = whitelist[type].filter(entry => entry.settings[category]);
+    const entries = whitelist[type].filter(entry => entry.settings?.[category]);
     if (entries.length === 0) {
         return interaction.update({ content: `There are no whitelisted ${type} entries for the ${category}.`, components: [] });
     }
@@ -804,7 +804,7 @@ buttonCollector.on('end', collected => {
 return message.channel.send({ embeds : [saixxxxd]})
 
 }
-} else if(!subcommand || !type.includes(['user','role','channel'])){
+} else if(!subcommand || !['user','role','channel'].includes(type)){
     const saixxxxd = client.util.embed()
     .setColor(client.color)
     .setAuthor({

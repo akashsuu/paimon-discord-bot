@@ -225,7 +225,7 @@ module.exports = {
                     return message.channel.send({ embeds: [embedMessage] })
                 }
                 if (punishment === 'ban') {
-                    let data = await client.db.get(`antiinvite_${message.guild.id}`)
+                    let data = await client.db.get(`antiinvite_${message.guild.id}`) || { enabled: false, punishment: null }
                     data.enabled = data.enabled
                     data.punishment = 'ban'
                     await client.db.set(`antiinvite_${message.guild.id}`, data)
@@ -248,7 +248,7 @@ module.exports = {
                     await message.channel.send({ embeds: [embedMessage] })
                 }
                 if (punishment === 'kick') {
-                    let data = await client.db.get(`antiinvite_${message.guild.id}`)
+                    let data = await client.db.get(`antiinvite_${message.guild.id}`) || { enabled: false, punishment: null }
                     data.enabled = data.enabled
                     data.punishment = 'kick'
                     await client.db.set(`antiinvite_${message.guild.id}`, data)
@@ -272,7 +272,7 @@ module.exports = {
                     await message.channel.send({ embeds: [embedMessage] })
                 }
                 if (punishment === 'mute') {
-                    let data = await client.db.get(`antiinvite_${message.guild.id}`)
+                    let data = await client.db.get(`antiinvite_${message.guild.id}`) || { enabled: false, punishment: null }
                     data.enabled = data.enabled
                     data.punishment = 'mute'
                     await client.db.set(`antiinvite_${message.guild.id}`, data)
@@ -298,7 +298,7 @@ module.exports = {
                     await message.channel.send({ embeds: [embedMessage] })
                 }
                 if (punishment === 'none') {
-                    let data = await client.db.get(`antiinvite_${message.guild.id}`)
+                    let data = await client.db.get(`antiinvite_${message.guild.id}`) || { enabled: false, punishment: null }
                     data.enabled = data.enabled
                     data.punishment = 'none'
                     await client.db.set(`antiinvite_${message.guild.id}`, data)

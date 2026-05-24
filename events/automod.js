@@ -3,8 +3,8 @@ module.exports = async (client) => {
     client.on('messageCreate', async (message) => {
         if (message.author.bot) return
         if (message.author.id === client.user.id) return
-        if (message.author.id === message.guild.ownerId) return
         if (!message.guild || !message.member) return;
+        if (message.author.id === message.guild.ownerId) return
         if (message.member.permissions.has('Administrator')) return;
         if (message.webhookId) return
         let check = await client.db.get(`blacklistserver_${client.user.id}`) || [];
@@ -16,13 +16,13 @@ module.exports = async (client) => {
             const whitelistData = await client.db.get(`automodbypass_${message?.guild?.id}`) || { user: [], role: [], channel: [] }
             const { user: userWhitelist = [], role: roleWhitelist = [], channel: channelWhitelist = [] } = whitelistData;
             const isUserWhitelisted = userWhitelist.some(userEntry => {
-                return userEntry.id === userId && userEntry.settings.antilink;
+                return userEntry.id === userId && userEntry.settings?.antilink;
             });
             const isRoleWhitelisted = roleWhitelist.some(roleEntry => {
-                return message.member.roles.cache.some(role => role.id === roleEntry.id && roleEntry.settings.antilink);
+                return message.member.roles.cache.some(role => role.id === roleEntry.id && roleEntry.settings?.antilink);
             });
             const isChannelWhitelisted = channelWhitelist.some(channelEntry => {
-                return message.channel.id === channelEntry.id && channelEntry.settings.antilink;
+                return message.channel.id === channelEntry.id && channelEntry.settings?.antilink;
             });
             if (isUserWhitelisted || isRoleWhitelisted || isChannelWhitelisted) return;
             let punishment = (await client.db.get(
@@ -179,14 +179,14 @@ module.exports = async (client) => {
     client.on('messageUpdate', async (oldMessage, newMessage) => {
         if (newMessage.author.bot) return;
         if (newMessage.author.id === client.user.id) return;
-        if (newMessage.author.id === newMessage.guild.ownerId) return;
         if (!newMessage.guild || !newMessage.member) return;
+        if (newMessage.author.id === newMessage.guild.ownerId) return;
         if (newMessage.member.permissions.has('Administrator')) return;
         if (newMessage.webhookId) return;
     
         // Check if the message content has been updated
-        const oldContent = oldMessage.content;
-        const newContent = newMessage.content;
+        const oldContent = oldMessage.content || '';
+        const newContent = newMessage.content || '';
     
         if (oldContent === newContent) return; // No change in message, no need to proceed
 
@@ -201,9 +201,9 @@ module.exports = async (client) => {
         const whitelistData = await client.db.get(`automodbypass_${newMessage?.guild?.id}`) || { user: [], role: [], channel: [] };
         const { user: userWhitelist = [], role: roleWhitelist = [], channel: channelWhitelist = [] } = whitelistData;
     
-        const isUserWhitelisted = userWhitelist.some(userEntry => userEntry.id === userId && userEntry.settings.antilink);
-        const isRoleWhitelisted = roleWhitelist.some(roleEntry => newMessage.member.roles.cache.some(role => role.id === roleEntry.id && roleEntry.settings.antilink));
-        const isChannelWhitelisted = channelWhitelist.some(channelEntry => newMessage.channel.id === channelEntry.id && channelEntry.settings.antilink);
+        const isUserWhitelisted = userWhitelist.some(userEntry => userEntry.id === userId && userEntry.settings?.antilink);
+        const isRoleWhitelisted = roleWhitelist.some(roleEntry => newMessage.member.roles.cache.some(role => role.id === roleEntry.id && roleEntry.settings?.antilink));
+        const isChannelWhitelisted = channelWhitelist.some(channelEntry => newMessage.channel.id === channelEntry.id && channelEntry.settings?.antilink);
     
         if (isUserWhitelisted || isRoleWhitelisted || isChannelWhitelisted) return;
     
@@ -359,13 +359,13 @@ module.exports = async (client) => {
             const whitelistData = await client.db.get(`automodbypass_${message?.guild?.id}`) || { user: [], role: [], channel: [] }
             const { user: userWhitelist = [], role: roleWhitelist = [], channel: channelWhitelist = [] } = whitelistData;
             const isUserWhitelisted = userWhitelist.some(userEntry => {
-                return userEntry.id === userIdd && userEntry.settings.antispam;
+                return userEntry.id === userIdd && userEntry.settings?.antispam;
             });
             const isRoleWhitelisted = roleWhitelist.some(roleEntry => {
-                return message.member.roles.cache.some(role => role.id === roleEntry.id && roleEntry.settings.antispam);
+                return message.member.roles.cache.some(role => role.id === roleEntry.id && roleEntry.settings?.antispam);
             });
             const isChannelWhitelisted = channelWhitelist.some(channelEntry => {
-                return message.channel.id === channelEntry.id && channelEntry.settings.antispam;
+                return message.channel.id === channelEntry.id && channelEntry.settings?.antispam;
             });
             if (isUserWhitelisted || isRoleWhitelisted || isChannelWhitelisted) return;
             let punishment = (await client.db.get(`antispamp_${message.guild.id}`)) || { data: null };
@@ -507,8 +507,8 @@ module.exports = async (client) => {
     client.on('messageCreate', async (message) => {
         if (message.author.bot) return
         if (message.author.id === client.user.id) return
-        if (message.author.id === message.guild.ownerId) return
         if (!message.guild || !message.member) return;
+        if (message.author.id === message.guild.ownerId) return
         if (message.member.permissions.has('Administrator')) return;
         if (message.webhookId) return
         let check = await client.db.get(`blacklistserver_${client.user.id}`) || [];
@@ -522,13 +522,13 @@ module.exports = async (client) => {
             const whitelistData = await client.db.get(`automodbypass_${message?.guild?.id}`) || { user: [], role: [], channel: [] }
             const { user: userWhitelist = [], role: roleWhitelist = [], channel: channelWhitelist = [] } = whitelistData;
             const isUserWhitelisted = userWhitelist.some(userEntry => {
-                return userEntry.id === userId && userEntry.settings.antiswear;
+                return userEntry.id === userId && userEntry.settings?.antiswear;
             });
             const isRoleWhitelisted = roleWhitelist.some(roleEntry => {
-                return message.member.roles.cache.some(role => role.id === roleEntry.id && roleEntry.settings.antiswear);
+                return message.member.roles.cache.some(role => role.id === roleEntry.id && roleEntry.settings?.antiswear);
             });
             const isChannelWhitelisted = channelWhitelist.some(channelEntry => {
-                return message.channel.id === channelEntry.id && channelEntry.settings.antiswear;
+                return message.channel.id === channelEntry.id && channelEntry.settings?.antiswear;
             });
             if (isUserWhitelisted || isRoleWhitelisted || isChannelWhitelisted) return;
 
@@ -637,7 +637,7 @@ module.exports = async (client) => {
                     }
                 } else if (action === 'ban') {
                     await message.delete()
-                    if (message.member.banable) {
+                    if (message.member.bannable) {
                         try {
                             await message.member.ban(
                                 'akashsuu | ANTI WORDS | BAN'
@@ -672,17 +672,16 @@ module.exports = async (client) => {
 // ANTI SWEAR ON EDIT 
 client.on('messageUpdate', async (oldMessage, newMessage) => {
     // Ensure we're not processing messages from bots or the client itself
+    if (!newMessage.guild || !newMessage.member) return;
     if (
         newMessage.author.bot ||
         newMessage.author.id === client.user.id ||
         newMessage.author.id === newMessage.guild.ownerId ||
-        !newMessage.guild ||
-        !newMessage.member ||
         newMessage.member.permissions.has('Administrator') ||
         newMessage.webhookId
     ) return;
-        const oldContent = oldMessage.content;
-        const newContent = newMessage.content;
+        const oldContent = oldMessage.content || '';
+        const newContent = newMessage.content || '';
         if (oldContent === newContent) return;
 
     let check = await client.db.get(`blacklistserver_${client.user.id}`) || [];
@@ -697,9 +696,9 @@ client.on('messageUpdate', async (oldMessage, newMessage) => {
         const whitelistData = await client.db.get(`automodbypass_${newMessage?.guild?.id}`) || { user: [], role: [], channel: [] };
         const { user: userWhitelist = [], role: roleWhitelist = [], channel: channelWhitelist = [] } = whitelistData;
 
-        const isUserWhitelisted = userWhitelist.some(userEntry => userEntry.id === userId && userEntry.settings.antiswear);
-        const isRoleWhitelisted = roleWhitelist.some(roleEntry => newMessage.member.roles.cache.some(role => role.id === roleEntry.id && roleEntry.settings.antiswear));
-        const isChannelWhitelisted = channelWhitelist.some(channelEntry => newMessage.channel.id === channelEntry.id && channelEntry.settings.antiswear);
+        const isUserWhitelisted = userWhitelist.some(userEntry => userEntry.id === userId && userEntry.settings?.antiswear);
+        const isRoleWhitelisted = roleWhitelist.some(roleEntry => newMessage.member.roles.cache.some(role => role.id === roleEntry.id && roleEntry.settings?.antiswear));
+        const isChannelWhitelisted = channelWhitelist.some(channelEntry => newMessage.channel.id === channelEntry.id && channelEntry.settings?.antiswear);
 
         if (isUserWhitelisted || isRoleWhitelisted || isChannelWhitelisted) return;
 
@@ -786,7 +785,7 @@ client.on('messageUpdate', async (oldMessage, newMessage) => {
                 }
             } else if (action === 'ban') {
                 await newMessage.delete();
-                if (newMessage.member.banable) {
+                    if (newMessage.member.bannable) {
                     try {
                         await newMessage.member.ban('akashsuu | ANTI WORDS | BAN');
                         let success = await newMessage.channel.send({
@@ -988,26 +987,27 @@ client.on('messageUpdate', async (oldMessage, newMessage) => {
 
     // ANTI INVITE
     client.on('messageCreate', async (message) => {
-        if (message.author.bot || message.author.id === client.user.id || message.author.id === message.guild.ownerId || !message.guild || !message.member || message.member.permissions.has('Administrator') || message.webhookId) return;
+        if (!message.guild || !message.member) return;
+        if (message.author.bot || message.author.id === client.user.id || message.author.id === message.guild.ownerId || message.member.permissions.has('Administrator') || message.webhookId) return;
         let check = await client.db.get(`blacklistserver_${client.user.id}`) || [];
         if (check.includes(message?.guild?.id)) return;
         try {
 
-            let antiinvite = await client.db.get(`antiinvite_${message?.guild?.id}`);
+            let antiinvite = await client.db.get(`antiinvite_${message?.guild?.id}`) || { enabled: false, punishment: null };
             if (antiinvite.enabled !== true) return;
 
             const userId = message.author.id;
             const whitelistData = await client.db.get(`automodbypass_${message?.guild?.id}`) || { user: [], role: [], channel: [] };
             const { user: userWhitelist = [], role: roleWhitelist = [], channel: channelWhitelist = [] } = whitelistData;
 
-            const isUserWhitelisted = userWhitelist.some((userEntry) => userEntry.id === userId && userEntry.settings.antiinvite);
-            const isRoleWhitelisted = roleWhitelist.some((roleEntry) => message.member.roles.cache.some((role) => role.id === roleEntry.id && roleEntry.settings.antiinvite));
-            const isChannelWhitelisted = channelWhitelist.some((channelEntry) => message.channel.id === channelEntry.id && channelEntry.settings.antiinvite);
+            const isUserWhitelisted = userWhitelist.some((userEntry) => userEntry.id === userId && userEntry.settings?.antiinvite);
+            const isRoleWhitelisted = roleWhitelist.some((roleEntry) => message.member.roles.cache.some((role) => role.id === roleEntry.id && roleEntry.settings?.antiinvite));
+            const isChannelWhitelisted = channelWhitelist.some((channelEntry) => message.channel.id === channelEntry.id && channelEntry.settings?.antiinvite);
 
             if (isUserWhitelisted || isRoleWhitelisted || isChannelWhitelisted) return;
 
             const action = antiinvite.punishment;
-            const urlRegex =  /(?:https?:\/\/)?(?:www\.)?(discord\.(gg|io|me|li|club)|discord(app)?\.com\/invite)\/[\w-]+/i;
+            const urlRegex = /(?:https?:\/\/)?(?:www\.)?(?:discord\.(?:gg|io|me|li|club)|discord(?:app)?\.com\/invite)\/[\w-]+/gi;
             const allowedDomains = ["giphy.com", "tenor.com"];
             const isAllowedLink = (url) => allowedDomains.some((domain) => url.includes(domain));
             const checkmessage = message.content;
@@ -1118,41 +1118,37 @@ client.on('messageUpdate', async (oldMessage, newMessage) => {
 // ANTI INVITE ON EDIT 
 client.on('messageUpdate', async (oldMessage, newMessage) => {
     // Ensure we're not processing messages from bots or the client itself
+    if (!newMessage.guild || !newMessage.member) return;
     if (
         newMessage.author.bot ||
         newMessage.author.id === client.user.id ||
         newMessage.author.id === newMessage.guild.ownerId ||
-        !newMessage.guild ||
-        !newMessage.member ||
         newMessage.member.permissions.has('Administrator') ||
         newMessage.webhookId
     ) return;
+    const oldContent = oldMessage.content || '';
+    const newContent = newMessage.content || '';
     let check = await client.db.get(`blacklistserver_${client.user.id}`) || [];
     if (check.includes(newMessage?.guild?.id)) return;
     if (oldContent === newContent) return;
     try {
-        let antiinvite = await client.db.get(`antiinvite_${newMessage?.guild?.id}`);
+        let antiinvite = await client.db.get(`antiinvite_${newMessage?.guild?.id}`) || { enabled: false, punishment: null };
         if (antiinvite.enabled !== true) return;
 
         const userId = newMessage.author.id;
         const whitelistData = await client.db.get(`automodbypass_${newMessage?.guild?.id}`) || { user: [], role: [], channel: [] };
         const { user: userWhitelist = [], role: roleWhitelist = [], channel: channelWhitelist = [] } = whitelistData;
 
-        const isUserWhitelisted = userWhitelist.some((userEntry) => userEntry.id === userId && userEntry.settings.antiinvite);
-        const isRoleWhitelisted = roleWhitelist.some((roleEntry) => newMessage.member.roles.cache.some((role) => role.id === roleEntry.id && roleEntry.settings.antiinvite));
-        const isChannelWhitelisted = channelWhitelist.some((channelEntry) => newMessage.channel.id === channelEntry.id && channelEntry.settings.antiinvite);
+        const isUserWhitelisted = userWhitelist.some((userEntry) => userEntry.id === userId && userEntry.settings?.antiinvite);
+        const isRoleWhitelisted = roleWhitelist.some((roleEntry) => newMessage.member.roles.cache.some((role) => role.id === roleEntry.id && roleEntry.settings?.antiinvite));
+        const isChannelWhitelisted = channelWhitelist.some((channelEntry) => newMessage.channel.id === channelEntry.id && channelEntry.settings?.antiinvite);
 
         if (isUserWhitelisted || isRoleWhitelisted || isChannelWhitelisted) return;
 
         const action = antiinvite.punishment;
-        const urlRegex = /(?:https?:\/\/)?(?:www\.)?(discord\.(gg|io|me|li|club)|discord(app)?\.com\/invite)\/[\w-]+/i;
+        const urlRegex = /(?:https?:\/\/)?(?:www\.)?(?:discord\.(?:gg|io|me|li|club)|discord(?:app)?\.com\/invite)\/[\w-]+/gi;
         const allowedDomains = ["giphy.com", "tenor.com"];
         const isAllowedLink = (url) => allowedDomains.some((domain) => url.includes(domain));
-
-        const oldContent = oldMessage.content;
-        const newContent = newMessage.content;
-
-        // If message content changes
 
         const urls = newContent.match(urlRegex);
 

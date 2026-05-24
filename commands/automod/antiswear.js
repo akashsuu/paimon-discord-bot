@@ -585,14 +585,15 @@ module.exports = {
                 }
                 break;
                 case 'config':
-                    const punish = await client.db.get(`antilinkp_${message.guild.id}`) || { data : null }
-                    const value = await client.db.get(`antilink_${message.guild.id}`) || null
+                    const punish = await client.db.get(`antiswearp_${message.guild.id}`) || { data : null }
+                    const value = await client.db.get(`antiswear_${message.guild.id}`) || null
                     const embed = client.util.embed()
                     embed.setColor(client.color)
                     embed.setAuthor({ name: `Antiswear Config for ${message.guild.name}` })
                     embed.addFields({ name: `Antiswear Status`, value: `${value ? client.emoji.tick : client.emoji.cross}`, inline: true })
                     embed.addFields({ name: `Antiswear Punishment Type`, value: `${punish ? punish.data : "None"}`, inline: true })
                     await message.channel.send({ embeds: [embed] })
+                    break;
                 
                 default:
                 return message.channel.send({ embeds: [antiswear] })
