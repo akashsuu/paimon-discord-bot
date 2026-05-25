@@ -1,10 +1,4 @@
 const axios = require('axios')
-<<<<<<< HEAD
-
-const DEFAULT_LOCAL_URL = 'http://127.0.0.1:1234'
-
-const cleanText = (value) => String(value || '').replace(/\s+/g, ' ').trim()
-=======
 const { AttachmentBuilder } = require('discord.js')
 
 const DEFAULT_LOCAL_URL = 'http://127.0.0.1:1234'
@@ -21,7 +15,6 @@ const cleanLessonText = (value) => {
         .replace(/\n{3,}/g, '\n\n')
         .trim()
 }
->>>>>>> 40fc381 (added many things)
 
 const getLocalBaseUrl = (client) => {
     return (
@@ -133,11 +126,7 @@ const askTeacher = async ({ client, baseUrl, model, topic, username }) => {
         if (!reply) throw new Error('LM Studio API returned an invalid response')
 
         return {
-<<<<<<< HEAD
-            reply: cleanText(reply),
-=======
             reply: cleanLessonText(reply),
->>>>>>> 40fc381 (added many things)
             promptTokens: Number(response.data?.usage?.prompt_tokens) || 0,
             completionTokens: Number(response.data?.usage?.completion_tokens) || 0,
             durationMs: Date.now() - started
@@ -163,11 +152,7 @@ const askTeacher = async ({ client, baseUrl, model, topic, username }) => {
         if (!reply) throw new Error('Local API returned an invalid response')
 
         return {
-<<<<<<< HEAD
-            reply: cleanText(reply),
-=======
             reply: cleanLessonText(reply),
->>>>>>> 40fc381 (added many things)
             promptTokens: Number(response.data?.usage?.prompt_tokens) || 0,
             completionTokens: Number(response.data?.usage?.completion_tokens) || 0,
             durationMs: Date.now() - started
@@ -194,11 +179,7 @@ const askTeacher = async ({ client, baseUrl, model, topic, username }) => {
     if (!reply) throw new Error('Ollama returned an invalid response')
 
     return {
-<<<<<<< HEAD
-        reply: cleanText(reply),
-=======
         reply: cleanLessonText(reply),
->>>>>>> 40fc381 (added many things)
         promptTokens: Number(response.data?.prompt_eval_count) || 0,
         completionTokens: Number(response.data?.eval_count) || 0,
         durationMs: Math.round((Number(response.data?.total_duration) || 0) / 1000000)
@@ -207,11 +188,7 @@ const askTeacher = async ({ client, baseUrl, model, topic, username }) => {
 
 const splitLesson = (text, maxLength = 3600) => {
     const chunks = []
-<<<<<<< HEAD
-    let remaining = cleanText(text)
-=======
     let remaining = cleanLessonText(text)
->>>>>>> 40fc381 (added many things)
 
     while (remaining.length > maxLength) {
         let index = remaining.lastIndexOf('\n\n', maxLength)
@@ -224,11 +201,7 @@ const splitLesson = (text, maxLength = 3600) => {
     }
 
     if (remaining) chunks.push(remaining)
-<<<<<<< HEAD
-    return chunks.slice(0, 4)
-=======
     return chunks
->>>>>>> 40fc381 (added many things)
 }
 
 const saveUsage = async (client, guildId, usage) => {
@@ -254,8 +227,6 @@ const saveUsage = async (client, guildId, usage) => {
     await client.db.set(key, current)
 }
 
-<<<<<<< HEAD
-=======
 const makeSafeFileName = (topic) => {
     const slug = cleanText(topic)
         .toLowerCase()
@@ -266,7 +237,6 @@ const makeSafeFileName = (topic) => {
     return `${slug || 'lesson'}-akashsuu-teacher.txt`
 }
 
->>>>>>> 40fc381 (added many things)
 module.exports = {
     name: 'teach',
     aliases: ['teacher', 'learn', 'lesson'],
@@ -321,8 +291,6 @@ module.exports = {
 
             await saveUsage(client, message.guild.id, { ...result, model })
 
-<<<<<<< HEAD
-=======
             if (result.reply.length > MAX_EMBED_LESSON_LENGTH) {
                 const attachment = new AttachmentBuilder(Buffer.from(result.reply, 'utf8'), {
                     name: makeSafeFileName(topic)
@@ -347,7 +315,6 @@ module.exports = {
                 })
             }
 
->>>>>>> 40fc381 (added many things)
             const chunks = splitLesson(result.reply)
             for (let i = 0; i < chunks.length; i += 1) {
                 const embed = client.util.embed()

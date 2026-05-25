@@ -96,10 +96,6 @@ module.exports = {
                     )
                     servers.push(`${message.guild.id}`)
                     client.db.set(`upremserver_${message.author.id}`, servers)
-<<<<<<< HEAD
-                    await message.guild.members.me.setNickname(client.config.BOT_NAME || 'akashsuu').catch((err) => {})
-=======
->>>>>>> 40fc381 (added many things)
                     return message.reply({
                         embeds: [
                             embed.setDescription(

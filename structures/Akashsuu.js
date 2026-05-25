@@ -6,14 +6,6 @@ const Utils = require('./util')
 const { glob } = require('glob')
 const { promisify } = require('util')
 const { Database } = require('quickmongo')
-<<<<<<< HEAD
-const { QuickDB } = require('quick.db')
-const axios = require('axios')
-const pg = require('pg')
-const redis = require("redis");
-const { ClusterClient, getInfo } = require('discord-hybrid-sharding');
-const Sql = require('better-sqlite3')
-=======
 const axios = require('axios')
 const { ClusterClient, getInfo } = require('discord-hybrid-sharding');
 
@@ -50,7 +42,6 @@ function createDisabledSqlite(name, reason) {
         prepare: disabled
     }
 }
->>>>>>> 40fc381 (added many things)
 
 function normalizeEmoji(value) {
     if (typeof value !== 'string') return value
@@ -72,15 +63,6 @@ const formatError = (error) => {
     return String(error.stack || error.message || error).slice(0, 1800)
 }
 
-<<<<<<< HEAD
-module.exports = class Akashsuu extends Client {
-    constructor() {
-        super({
-            intents: 53608447,
-            fetchAllMembers: true,
-            shards: getInfo().SHARD_LIST,
-            shardCount: getInfo().TOTAL_SHARDS,
-=======
 const resolveBotToken = (config = {}) => {
     const token = process.env.TOKEN || process.env.DISCORD_TOKEN || process.env.BOT_TOKEN || config.TOKEN
     return String(token || '')
@@ -99,7 +81,6 @@ module.exports = class Akashsuu extends Client {
                 shards: clusterInfo.SHARD_LIST,
                 shardCount: clusterInfo.TOTAL_SHARDS
             } : {}),
->>>>>>> 40fc381 (added many things)
             allowedMentions: {
                 parse: ['users', 'roles'],
                 repliedUser: true
@@ -119,12 +100,6 @@ module.exports = class Akashsuu extends Client {
         })
 
         this.setMaxListeners(Infinity)
-<<<<<<< HEAD
-        this.cluster = new ClusterClient(this);
-        this.config = require(`${process.cwd()}/config.json`)
-        this.config.TOKEN = process.env.TOKEN || this.config.TOKEN
-        this.config.MONGO_DB = process.env.MONGO_DB || this.config.MONGO_DB
-=======
         this.cluster = clusterInfo ? new ClusterClient(this) : createSingleProcessCluster(this);
         this.config = require(`${process.cwd()}/config.json`)
         this.config.TOKEN = resolveBotToken(this.config)
@@ -132,7 +107,6 @@ module.exports = class Akashsuu extends Client {
         if (this.config.TOKEN) {
             this.rest.setToken(this.config.TOKEN)
         }
->>>>>>> 40fc381 (added many things)
         this.emoji = Object.fromEntries(
             Object.entries(require(`${process.cwd()}/emoji.json`)).map(([key, value]) => [
                 key,
@@ -186,16 +160,6 @@ module.exports = class Akashsuu extends Client {
 
 
     async initializedata() {
-<<<<<<< HEAD
-            this.warn = new Sql(`${process.cwd()}/Database/warns.db`);
-            this.warn.pragma('journal_mode = WAL');
-            this.warn.prepare(`CREATE TABLE IF NOT EXISTS warnings (id INTEGER PRIMARY KEY AUTOINCREMENT,guildId TEXT NOT NULL,userId TEXT NOT NULL,reason TEXT,moderatorId TEXT,timestamp TEXT,warnId TEXT NOT NULL)`).run();
-            this.snipe = new Sql(`${process.cwd()}/Database/snipe.db`);
-            this.snipe.pragma('journal_mode = WAL');
-            this.snipe.prepare(`CREATE TABLE IF NOT EXISTS snipes (id INTEGER PRIMARY KEY AUTOINCREMENT,guildId TEXT NOT NULL,channelId TEXT NOT NULL,content TEXT,author TEXT,timestamp INTEGER,imageUrl TEXT)`).run();
-            this.msgs = new Sql(`${process.cwd()}/Database/messages.db`);
-            this.msgs.pragma('journal_mode = WAL');
-=======
         let Sql
         try {
             Sql = require('better-sqlite3')
@@ -218,18 +182,13 @@ module.exports = class Akashsuu extends Client {
             this.snipe.prepare(`CREATE TABLE IF NOT EXISTS snipes (id INTEGER PRIMARY KEY AUTOINCREMENT,guildId TEXT NOT NULL,channelId TEXT NOT NULL,content TEXT,author TEXT,timestamp INTEGER,imageUrl TEXT)`).run()
             this.msgs = new Sql(`${process.cwd()}/Database/messages.db`)
             this.msgs.pragma('journal_mode = WAL')
->>>>>>> 40fc381 (added many things)
             this.msgs.prepare(`CREATE TABLE IF NOT EXISTS messages (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 guildId TEXT NOT NULL,
                 userId TEXT NOT NULL,
                 totalMessages INTEGER DEFAULT 0,
                 UNIQUE(guildId, userId)
-<<<<<<< HEAD
-            );`).run();
-=======
             );`).run()
->>>>>>> 40fc381 (added many things)
             this.msgs.prepare(`CREATE TABLE IF NOT EXISTS dailymessages (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 guildId TEXT NOT NULL,
@@ -237,19 +196,11 @@ module.exports = class Akashsuu extends Client {
                 date TEXT NOT NULL,
                 dailyCount INTEGER DEFAULT 0,
                 UNIQUE(guildId, userId, date)
-<<<<<<< HEAD
-            );`).run();
-        
-        
-            this.livelb = new Sql(`${process.cwd()}/Database/liveleaderboard.db`);
-            this.livelb.pragma('journal_mode = WAL');
-=======
             );`).run()
         
         
             this.livelb = new Sql(`${process.cwd()}/Database/liveleaderboard.db`)
             this.livelb.pragma('journal_mode = WAL')
->>>>>>> 40fc381 (added many things)
             this.livelb.prepare(`CREATE TABLE IF NOT EXISTS liveleaderboard (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             guildId TEXT NOT NULL,
@@ -257,17 +208,10 @@ module.exports = class Akashsuu extends Client {
             messageId TEXT NOT NULL,
             channelId TEXT NOT NULL,
             UNIQUE(guildId, type)
-<<<<<<< HEAD
-        );`).run();
-        
-            this.voiceDb = new Sql(`${process.cwd()}/Database/voice.db`);
-            this.voiceDb.pragma('journal_mode = WAL');
-=======
         );`).run()
         
             this.voiceDb = new Sql(`${process.cwd()}/Database/voice.db`)
             this.voiceDb.pragma('journal_mode = WAL')
->>>>>>> 40fc381 (added many things)
             this.voiceDb.prepare(`CREATE TABLE IF NOT EXISTS dailyvoice (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 guildId TEXT NOT NULL,
@@ -275,11 +219,7 @@ module.exports = class Akashsuu extends Client {
                 date TEXT NOT NULL,
                 dailyVoiceTime INTEGER DEFAULT 0,
                 UNIQUE(guildId, userId, date)
-<<<<<<< HEAD
-            );`).run();
-=======
             );`).run()
->>>>>>> 40fc381 (added many things)
             
             this.voiceDb.prepare(`CREATE TABLE IF NOT EXISTS voice (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -287,10 +227,6 @@ module.exports = class Akashsuu extends Client {
                 userId TEXT NOT NULL,
                 totalVoiceTime INTEGER DEFAULT 0,
                 UNIQUE(guildId, userId)
-<<<<<<< HEAD
-            );`).run();    
-          }
-=======
             );`).run()
         } catch (err) {
             this.logger?.log?.(`SQLite databases failed to open. SQLite commands are disabled: ${err.message}`, 'error')
@@ -301,7 +237,6 @@ module.exports = class Akashsuu extends Client {
             this.voiceDb = createDisabledSqlite('voice leaderboard', err.message)
         }
     }
->>>>>>> 40fc381 (added many things)
 
     async initializeMongoose() {
         if (!this.config.MONGO_DB) throw new Error('Missing MONGO_DB. Add it to your .env file.')
@@ -318,17 +253,12 @@ module.exports = class Akashsuu extends Client {
         fs.readdirSync('./events/').forEach((file) => {
             if (file.endsWith('.js')) {
                 let eventName = file.split('.')[0]
-<<<<<<< HEAD
-                require(`${process.cwd()}/events/${file}`)(this)
-                this.logger.log(`Updated Event ${eventName}.`, 'event')
-=======
                 try {
                     require(`${process.cwd()}/events/${file}`)(this)
                     this.logger.log(`Updated Event ${eventName}.`, 'event')
                 } catch (err) {
                     this.logger.log(`Skipped Event ${eventName}: ${err.message}`, 'warn')
                 }
->>>>>>> 40fc381 (added many things)
             }
         })
     }
@@ -365,14 +295,6 @@ module.exports = class Akashsuu extends Client {
             }
         }
         commandFiles.map((value) => {
-<<<<<<< HEAD
-            const file = require(value)
-            const splitted = value.split('/')
-            const directory = splitted[splitted.length - 2]
-            if (file.name) {
-                const properties = { directory, ...file }
-                this.commands.set(file.name, properties)
-=======
             try {
                 const file = require(value)
                 const splitted = value.split(/[\\/]/)
@@ -383,7 +305,6 @@ module.exports = class Akashsuu extends Client {
                 }
             } catch (err) {
                 this.logger.log(`Skipped Command ${value}: ${err.message}`, 'warn')
->>>>>>> 40fc381 (added many things)
             }
         })
         this.logger.log(`Updated ${this.commands.size} Commands.`, 'cmd')

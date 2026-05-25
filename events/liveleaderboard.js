@@ -3,10 +3,6 @@ const cron = require('node-cron');
 
 module.exports = async (client) => {
      client.voiceTimes = new Map(); // To store user voice join times
-<<<<<<< HEAD
-
-    client.once('ready', async () => {
-=======
      const hasSqlite = (db) => db && !db.disabled && typeof db.prepare === 'function';
 
     client.once('ready', async () => {
@@ -18,17 +14,13 @@ module.exports = async (client) => {
             client.logger?.log?.('Live leaderboard database is disabled. Skipping live leaderboard restore.', 'warn');
         }
 
->>>>>>> 40fc381 (added many things)
         await client.guilds.fetch();
         const guilds = client.guilds.cache.map(guild => guild.id);
 
         for (const guildId of guilds) {
             let check = await client.db.get(`blacklistserver_${client?.user?.id}`) || [];
             if (check.includes(guildId)) return;
-<<<<<<< HEAD
-=======
             if (!canUseLeaderboards) continue;
->>>>>>> 40fc381 (added many things)
 
             const storedLeaderboards = await client.livelb.prepare(`SELECT * FROM liveleaderboard WHERE guildId = ?`).all(guildId);
             if (storedLeaderboards.length) {
@@ -60,10 +52,7 @@ module.exports = async (client) => {
 
                             switch (type) {
                                 case 'messages':
-<<<<<<< HEAD
-=======
                                     if (!canUseMessages) return;
->>>>>>> 40fc381 (added many things)
                                     leaderboardData = await client.msgs.prepare(`
                                         SELECT userId, totalMessages AS total 
                                         FROM messages 
@@ -73,10 +62,7 @@ module.exports = async (client) => {
                                     `).all(guildId);
                                     break;
                                 case 'dailymessages':
-<<<<<<< HEAD
-=======
                                     if (!canUseMessages) return;
->>>>>>> 40fc381 (added many things)
                                     leaderboardData = await client.msgs.prepare(`
                                         SELECT userId, SUM(dailyCount) AS total 
                                         FROM dailymessages 
@@ -87,10 +73,7 @@ module.exports = async (client) => {
                                     `).all(guildId);
                                     break;
                                 case 'voice':
-<<<<<<< HEAD
-=======
                                     if (!canUseVoice) return;
->>>>>>> 40fc381 (added many things)
                                     leaderboardData = await client.voiceDb.prepare(`
                                         SELECT userId, totalVoiceTime AS total 
                                         FROM voice 
@@ -100,10 +83,7 @@ module.exports = async (client) => {
                                     `).all(guildId);
                                     break;
                                 case 'dailyvoice':
-<<<<<<< HEAD
-=======
                                     if (!canUseVoice) return;
->>>>>>> 40fc381 (added many things)
                                     leaderboardData = await client.voiceDb.prepare(`
                                         SELECT userId, SUM(dailyVoiceTime) AS total 
                                         FROM dailyvoice 
@@ -153,15 +133,6 @@ module.exports = async (client) => {
         cron.schedule(
             '0 0 * * *',
             async () => {
-<<<<<<< HEAD
-                console.log('Daily cleanup job executed.');
-                for (const guildId of client.guilds.cache.map(guild => guild.id)) {
-                    try {
-                        await client.msgs.prepare(`
-                            DELETE FROM dailymessages`).run();   
-                        await client.voiceDb.prepare(`
-                            DELETE FROM dailyvoice`).run();
-=======
                 if (!hasSqlite(client.msgs) && !hasSqlite(client.voiceDb)) return;
                 console.log('Daily cleanup job executed.');
                 for (const guildId of client.guilds.cache.map(guild => guild.id)) {
@@ -174,7 +145,6 @@ module.exports = async (client) => {
                             await client.voiceDb.prepare(`
                                 DELETE FROM dailyvoice`).run();
                         }
->>>>>>> 40fc381 (added many things)
                         
                     } catch (err) {
                         console.error(`Error during cleanup for guild ${guildId}:`, err);
@@ -187,13 +157,9 @@ module.exports = async (client) => {
 
     // Count message events
     client.on('messageCreate', async (message) => {
-<<<<<<< HEAD
-        if (message.author.bot) return;
-=======
         if (!hasSqlite(client.msgs)) return;
         if (message.author.bot) return;
         if (!message.guild) return;
->>>>>>> 40fc381 (added many things)
 
         const guildId = message.guild.id;
         const userId = message.author.id;
@@ -220,10 +186,7 @@ module.exports = async (client) => {
 
    // Track voice state updates
 client.on('voiceStateUpdate', async (oldState, newState) => {
-<<<<<<< HEAD
-=======
     if (!hasSqlite(client.voiceDb)) return;
->>>>>>> 40fc381 (added many things)
     const userId = newState.member.id;
     const guildId = newState.guild.id;
 

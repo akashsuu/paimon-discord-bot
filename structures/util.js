@@ -635,8 +635,6 @@ module.exports = class Util {
                     .catch((_) => {})
                 return
             }
-<<<<<<< HEAD
-=======
             if (funny === 'music') {
                 let cmdList = [];
                 interaction.client.commands
@@ -663,7 +661,6 @@ module.exports = class Util {
                     .catch((_) => {})
                 return
             }
->>>>>>> 40fc381 (added many things)
             if (funny === 'verification') {
                 let cmdList = [];
                 interaction.client.commands

@@ -1,17 +1,7 @@
-<<<<<<< HEAD
-const wait = require('wait');
-=======
->>>>>>> 40fc381 (added many things)
 require('dotenv').config();
 require('module-alias/register');
 const path = require('path');
 const Akashsuu = require('./structures/Akashsuu.js');
-<<<<<<< HEAD
-
-const client = new Akashsuu();
-const config = require(`${process.cwd()}/config.json`);
-config.TOKEN = process.env.TOKEN || config.TOKEN;
-=======
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const client = new Akashsuu();
@@ -26,7 +16,6 @@ const resolveBotToken = () => {
 config.TOKEN = resolveBotToken();
 client.config.TOKEN = config.TOKEN;
 if (config.TOKEN) client.rest.setToken(config.TOKEN);
->>>>>>> 40fc381 (added many things)
 
 (async () => {
     try {

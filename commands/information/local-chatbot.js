@@ -19,11 +19,7 @@ const getLocalApiMode = (baseUrl) => {
     return process.env.LOCAL_CHATBOT_API || (/:(1234)$/.test(baseUrl) ? 'lmstudio' : 'ollama')
 }
 
-<<<<<<< HEAD
 const isOpenAICompatible = (baseUrl) => ['openai', 'lmstudio'].includes(getLocalApiMode(baseUrl))
-=======
-const isOpenAIComwtible = (baseUrl) => ['openai', 'lmstudio'].includes(getLocalApiMode(baseUrl))
->>>>>>> 40fc381 (added many things)
 
 const getLocalApiHeaders = (client) => {
     const apiKey = process.env.LOCAL_CHATBOT_API_KEY || client.config.LOCAL_CHATBOT_API_KEY
