@@ -1,18 +1,7 @@
 const axios = require('axios')
 const { AttachmentBuilder } = require('discord.js')
 
-const DEFAULT_HF_MUSIC_MODEL = 'facebook/musicgen-small'
 const DEFAULT_AUDIOCRAFT_API_URL = 'http://127.0.0.1:7868'
-const encodeModelId = (model) => String(model).split('/').map(encodeURIComponent).join('/')
-const hfApiUrls = (model) => {
-    const customUrl = process.env.HF_MUSIC_API_URL || process.env.HF_API_URL
-    const encodedModel = encodeModelId(model)
-    return [
-        customUrl,
-        `https://router.huggingface.co/hf-inference/models/${encodedModel}`,
-        `https://api-inference.huggingface.co/models/${encodedModel}?wait_for_model=true`
-    ].filter(Boolean)
-}
 
 const cleanText = (value) => String(value || '').replace(/\s+/g, ' ').trim()
 
@@ -47,8 +36,8 @@ const buildMusicPrompt = ({ mode, input }) => {
 }
 
 const getAudioCraftUrl = (client) => {
-    const url = process.env.AUDIOCRAFT_API_URL || client.config.AUDIOCRAFT_API_URL
-    return url ? String(url).replace(/\/+$/, '') : null
+    const url = process.env.AUDIOCRAFT_API_URL || client.config.AUDIOCRAFT_API_URL || DEFAULT_AUDIOCRAFT_API_URL
+    return String(url).replace(/\/+$/, '')
 }
 
 const createMusicWithAudioCraft = async ({ baseUrl, prompt, duration }) => {
@@ -90,73 +79,6 @@ const createMusicWithAudioCraft = async ({ baseUrl, prompt, duration }) => {
     }
 }
 
-const formatHfError = (err) => {
-    if (err.code === 'ENOTFOUND') {
-        return `DNS could not resolve ${err.hostname || 'Hugging Face'}. Your host/server DNS or firewall is blocking Hugging Face.`
-    }
-
-    if (err.code === 'ECONNREFUSED' || err.code === 'ETIMEDOUT' || err.code === 'EAI_AGAIN') {
-        return `Network connection to Hugging Face failed (${err.code}). Try again or check hosting outbound network/DNS.`
-    }
-
-    return err.message || String(err)
-}
-
-const createMusic = async ({ apiKey, model, prompt }) => {
-    let lastError = null
-
-    for (const url of hfApiUrls(model)) {
-        try {
-            const response = await axios.post(
-                url,
-                {
-                    inputs: prompt,
-                    parameters: {
-                        max_new_tokens: 768,
-                        duration: 30
-                    },
-                    options: {
-                        wait_for_model: true,
-                        use_cache: false
-                    }
-                },
-                {
-                    headers: {
-                        Authorization: `Bearer ${apiKey}`,
-                        Accept: 'audio/wav'
-                    },
-                    responseType: 'arraybuffer',
-                    timeout: 180000,
-                    validateStatus: () => true
-                }
-            )
-
-            const contentType = String(response.headers?.['content-type'] || '')
-            if (!response.status || response.status >= 400 || contentType.includes('application/json')) {
-                const errorText = Buffer.from(response.data || '').toString('utf8')
-                let message = errorText || `Hugging Face returned status ${response.status}`
-                try {
-                    const parsed = JSON.parse(errorText)
-                    message = parsed.error || parsed.message || message
-                } catch {}
-                throw new Error(message)
-            }
-
-            const audio = Buffer.from(response.data)
-            if (!audio.length) throw new Error('Hugging Face returned an empty audio file')
-
-            return {
-                audio,
-                extension: audioExtension(contentType)
-            }
-        } catch (err) {
-            lastError = err
-        }
-    }
-
-    throw new Error(formatHfError(lastError || new Error('Hugging Face request failed')))
-}
-
 module.exports = {
     name: 'music',
     aliases: ['musichelp'],
@@ -167,23 +89,11 @@ module.exports = {
         const creatorActions = ['lyrics', 'lyric', 'create', 'generate', 'make']
 
         if (creatorActions.includes(action)) {
-            const apiKey = process.env.HF_API_KEY || process.env.HUGGINGFACE_API_KEY || client.config.HF_API_KEY || client.config.HUGGINGFACE_API_KEY
-            const model = process.env.HF_MUSIC_MODEL || client.config.HF_MUSIC_MODEL || DEFAULT_HF_MUSIC_MODEL
             const audioCraftUrl = getAudioCraftUrl(client)
             const duration = Number(process.env.AUDIOCRAFT_DURATION || client.config.AUDIOCRAFT_DURATION || 20)
             const input = cleanText(args.slice(1).join(' '))
             const mode = ['lyrics', 'lyric'].includes(action) ? 'lyrics' : 'create'
             const prefix = message.guild.prefix || client.config.PREFIX
-
-            if (!apiKey && !audioCraftUrl) {
-                return message.channel.send({
-                    embeds: [
-                        client.util.embed()
-                            .setColor(client.color)
-                            .setDescription(`${client.emoji.cross} | Missing music generator setup. Add \`AUDIOCRAFT_API_URL=${DEFAULT_AUDIOCRAFT_API_URL}\` for local AudioCraft or add \`HF_API_KEY\` for Hugging Face.`)
-                    ]
-                })
-            }
 
             if (!input) {
                 return message.channel.send({
@@ -211,26 +121,17 @@ module.exports = {
                     client.util.embed()
                         .setColor(client.color)
                         .setTitle('Music Creator')
-                        .setDescription(`${client.emoji.tick} | Creating music with ${audioCraftUrl ? 'local AudioCraft' : 'Hugging Face'}. This can take 1-5 minutes...`)
+                        .setDescription(`${client.emoji.tick} | Creating music with local AudioCraft. This can take 1-5 minutes...`)
                         .addFields(
                             { name: 'Mode', value: `\`${mode}\``, inline: true },
-                            { name: 'Generator', value: `\`${audioCraftUrl ? 'AudioCraft local' : 'Hugging Face'}\``, inline: true },
-                            { name: 'Model', value: `\`${audioCraftUrl ? 'local MusicGen' : model}\``, inline: true }
+                            { name: 'Generator', value: '`AudioCraft local`', inline: true },
+                            { name: 'Server', value: `\`${audioCraftUrl}\``, inline: true }
                         )
                 ]
             })
 
             try {
-                let result
-                if (audioCraftUrl) {
-                    try {
-                        result = await createMusicWithAudioCraft({ baseUrl: audioCraftUrl, prompt, duration })
-                    } catch (err) {
-                        if (!apiKey) throw err
-                        client.logger?.log?.(`audiocraft music failed, falling back to hugging face: ${err.message}`, 'warn')
-                    }
-                }
-                if (!result) result = await createMusic({ apiKey, model, prompt })
+                const result = await createMusicWithAudioCraft({ baseUrl: audioCraftUrl, prompt, duration })
                 const filename = makeSafeName(input).replace(/\.wav$/, `.${result.extension}`)
                 const attachment = new AttachmentBuilder(result.audio, { name: filename })
 
@@ -242,8 +143,8 @@ module.exports = {
                             .setDescription(`${client.emoji.tick} | Generated music for ${message.author}.`)
                             .addFields(
                                 { name: 'Prompt', value: input.slice(0, 900) },
-                                { name: 'Generator', value: `\`${result.provider || 'Hugging Face'}\``, inline: true },
-                                { name: 'Model', value: `\`${result.provider === 'AudioCraft' ? 'local MusicGen' : model}\``, inline: true }
+                                { name: 'Generator', value: '`AudioCraft local`', inline: true },
+                                { name: 'Server', value: `\`${audioCraftUrl}\``, inline: true }
                             )
                             .setFooter({
                                 text: 'akashsuu music creator',
@@ -254,11 +155,14 @@ module.exports = {
                 })
             } catch (err) {
                 client.logger?.log?.(`music creator error: ${err.message}`, 'error')
+                const offline = ['ECONNREFUSED', 'ENOTFOUND', 'ETIMEDOUT', 'EAI_AGAIN'].includes(err.code) || /connect|ECONNREFUSED|ENOTFOUND|timed out/i.test(String(err.message))
                 return loading.edit({
                     embeds: [
                         client.util.embed()
                             .setColor(client.color)
-                            .setDescription(`${client.emoji.cross} | Music creator failed: \`${String(err.message || err).slice(0, 180)}\``)
+                            .setDescription(offline
+                                ? `${client.emoji.cross} | AudioCraft is not running at \`${audioCraftUrl}\`. Start it with \`python scripts/audiocraft_server.py\`, then try again.`
+                                : `${client.emoji.cross} | AudioCraft failed: \`${String(err.message || err).slice(0, 180)}\``)
                     ]
                 })
             }
@@ -289,8 +193,8 @@ module.exports = {
             `\`${message.guild.prefix}queue [page]\` - Show the queue`,
             `\`${message.guild.prefix}nowplaying\` - Show current song`,
             `\`${message.guild.prefix}volume <1-150>\` - Change volume`,
-            `\`${message.guild.prefix}music lyrics <lyrics>\` - Generate music from lyrics`,
-            `\`${message.guild.prefix}music create <prompt>\` - Generate music from a prompt`
+            `\`${message.guild.prefix}music lyrics <lyrics>\` - Generate music from lyrics with local AudioCraft`,
+            `\`${message.guild.prefix}music create <prompt>\` - Generate music from a prompt with local AudioCraft`
         ]
 
         return message.channel.send({
