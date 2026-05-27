@@ -50,12 +50,63 @@ const clearLeaveTimer = (player) => {
     player.setData?.('emptyVoiceTimer', null)
 }
 
+const normalizeTitle = (value) => {
+    return String(value || '')
+        .toLowerCase()
+        .replace(/\([^)]*\)|\[[^\]]*\]/g, ' ')
+        .replace(/\b(official|music|video|audio|lyrics?|lyric|visualizer|mv|hd|4k|remaster(?:ed)?|live|topic|provided to youtube by|slowed|reverb|sped up|nightcore|extended|version)\b/g, ' ')
+        .replace(/\b(ft|feat|featuring)\.?\s+.+$/g, ' ')
+        .replace(/[^a-z0-9]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+}
+
+const titleTokens = (value) => {
+    return normalizeTitle(value)
+        .split(' ')
+        .filter((token) => token.length > 1)
+}
+
+const tokenOverlap = (left, right) => {
+    if (!left.length || !right.length) return 0
+    const rightSet = new Set(right)
+    const shared = left.filter((token) => rightSet.has(token)).length
+    return shared / Math.min(left.length, right.length)
+}
+
+const isSameSongTitle = (leftTitle, rightTitle) => {
+    const left = titleTokens(leftTitle)
+    const right = titleTokens(rightTitle)
+    if (!left.length || !right.length) return false
+
+    const leftText = left.join(' ')
+    const rightText = right.join(' ')
+    if (leftText === rightText) return true
+    if (leftText.length >= 4 && rightText.includes(leftText)) return true
+    if (rightText.length >= 4 && leftText.includes(rightText)) return true
+
+    return tokenOverlap(left, right) >= 0.8
+}
+
+const recentAutoplayTitles = (player) => player.getData?.('recentAutoplayTitles') || []
+
+const rememberAutoplayTitle = (player, track) => {
+    const title = normalizeTitle(track?.info?.title)
+    if (!title) return
+
+    const recent = recentAutoplayTitles(player)
+    player.setData?.('recentAutoplayTitles', [title, ...recent.filter((item) => item !== title)].slice(0, 25))
+}
+
 const rememberSkippedTrack = (player, track) => {
     const uri = track?.info?.uri
-    if (!uri) return
+    const title = normalizeTitle(track?.info?.title)
+    if (!uri && !title) return
 
     const skipped = player.getData?.('skippedAutoplayUris') || []
-    player.setData?.('skippedAutoplayUris', [uri, ...skipped.filter((item) => item !== uri)].slice(0, 20))
+    const skippedTitles = player.getData?.('skippedAutoplayTitles') || []
+    if (uri) player.setData?.('skippedAutoplayUris', [uri, ...skipped.filter((item) => item !== uri)].slice(0, 20))
+    if (title) player.setData?.('skippedAutoplayTitles', [title, ...skippedTitles.filter((item) => item !== title)].slice(0, 20))
 }
 
 const getPlayerVoiceChannel = (client, player) => {
@@ -100,8 +151,9 @@ const relatedQueries = (track) => {
 
 const searchRelatedTrack = async (player, seedTrack) => {
     const seedUri = seedTrack?.info?.uri
-    const seedTitle = String(seedTrack?.info?.title || '').toLowerCase()
     const skippedUris = new Set(player.getData?.('skippedAutoplayUris') || [])
+    const skippedTitles = player.getData?.('skippedAutoplayTitles') || []
+    const recentTitles = recentAutoplayTitles(player)
     const requester = seedTrack?.requester || player.getData?.('autoplayRequester')
     const sources = [
         process.env.LAVALINK_SEARCH || 'ytmsearch',
@@ -113,8 +165,12 @@ const searchRelatedTrack = async (player, seedTrack) => {
         for (const source of sources) {
             const result = await player.search({ query, source }, requester).catch(() => null)
             const track = result?.tracks?.find((candidate) => {
-                const title = String(candidate?.info?.title || '').toLowerCase()
-                return candidate?.info?.uri !== seedUri && !skippedUris.has(candidate?.info?.uri) && title && title !== seedTitle
+                const title = candidate?.info?.title
+                if (!title || candidate?.info?.uri === seedUri || skippedUris.has(candidate?.info?.uri)) return false
+                if (isSameSongTitle(seedTrack?.info?.title, title)) return false
+                if (skippedTitles.some((skippedTitle) => isSameSongTitle(skippedTitle, title))) return false
+                if (recentTitles.some((recentTitle) => isSameSongTitle(recentTitle, title))) return false
+                return true
             })
             if (track) return track
         }
@@ -208,6 +264,7 @@ module.exports = async (client) => {
         clearLeaveTimer(player)
         player.setData?.('autoplaySeedTrack', track)
         if (track?.requester) player.setData?.('autoplayRequester', track.requester)
+        rememberAutoplayTitle(player, track)
 
         if (player.getData?.('suppressNextTrackStartMessage')) {
             player.setData?.('suppressNextTrackStartMessage', undefined)
