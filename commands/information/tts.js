@@ -11,6 +11,18 @@ const DEFAULT_MODEL = 'canopylabs/orpheus-v1-english'
 const DEFAULT_VOICE = 'hannah'
 const execFileAsync = promisify(execFile)
 const VOICE_OPTIONS = {
+    f1: 'autumn',
+    f2: 'diana',
+    f3: 'hannah',
+    m1: 'austin',
+    m2: 'daniel',
+    m3: 'troy',
+    autumn: 'autumn',
+    diana: 'diana',
+    hannah: 'hannah',
+    austin: 'austin',
+    daniel: 'daniel',
+    troy: 'troy',
     girl: 'hannah',
     female: 'hannah',
     woman: 'hannah',
@@ -18,9 +30,35 @@ const VOICE_OPTIONS = {
     male: 'troy',
     man: 'troy'
 }
+const VOICE_LABELS = {
+    autumn: 'Autumn female',
+    diana: 'Diana female',
+    hannah: 'Hannah female',
+    austin: 'Austin male',
+    daniel: 'Daniel male',
+    troy: 'Troy male'
+}
+const EMOTION_OPTIONS = {
+    cheerful: '[cheerful]',
+    happy: '[cheerful]',
+    whisper: '[whisper]',
+    sad: '[sad]',
+    angry: '[angry]',
+    laugh: '[laughs]',
+    laughs: '[laughs]',
+    laughing: '[laughs]',
+    sigh: '[sighs]',
+    sighs: '[sighs]',
+    surprised: '[surprised]',
+    excited: '[excited]',
+    crying: '[crying]',
+    cry: '[crying]',
+    nervous: '[nervous]'
+}
 const FALLBACK_TTS = [
     { model: 'canopylabs/orpheus-v1-english', voice: 'hannah' },
-    { model: 'canopylabs/orpheus-v1-english', voice: 'troy' }
+    { model: 'canopylabs/orpheus-v1-english', voice: 'troy' },
+    { model: 'canopylabs/orpheus-v1-english', voice: 'autumn' }
 ]
 const EFFECT_OPTIONS = new Set(['mic', 'radio', 'walkie', 'alien', 'ghost', 'man', 'moan'])
 
@@ -29,6 +67,11 @@ const cleanText = (value) => String(value || '').replace(/\s+/g, ' ').trim()
 const makeSafeName = (value) => {
     const name = String(value || 'akashsuu').toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 24)
     return name || 'akashsuu'
+}
+
+const normalizeEmotion = (value) => {
+    const raw = String(value || '').toLowerCase().replace(/^\[|\]$/g, '')
+    return EMOTION_OPTIONS[raw] || null
 }
 
 const requestSpeech = async ({ apiKey, model, voice, text }) => {
@@ -139,6 +182,8 @@ module.exports = {
         if (apiOnlyMode) args.shift()
         const hindiMode = ['hindi', 'hi'].includes(args[0]?.toLowerCase())
         if (hindiMode) args.shift()
+        const emotionMode = normalizeEmotion(args[0])
+        if (emotionMode) args.shift()
         let effectMode = EFFECT_OPTIONS.has(args[0]?.toLowerCase()) ? args.shift().toLowerCase() : null
         const voiceMode = args[0]?.toLowerCase()
         const selectedGroqVoice = VOICE_OPTIONS[voiceMode]
@@ -153,13 +198,18 @@ module.exports = {
             const replied = await message.channel.messages.fetch(message.reference.messageId).catch(() => null)
             text = cleanText(replied?.content)
         }
+        const ttsInput = emotionMode ? `${emotionMode} ${text}` : text
 
         if (!text) {
             return message.channel.send({
                 embeds: [
                     client.util.embed()
                         .setColor(client.color)
-                        .setDescription(`${client.emoji.cross} | Usage: \`${message.guild.prefix}tts girl hello akashsuu\`, \`${message.guild.prefix}tts man hello\`, \`${message.guild.prefix}tts moan tired...\`, \`${message.guild.prefix}tts ghost wake up\`, or \`${message.guild.prefix}tts hindi namaste\`.`)
+                        .setDescription(
+                            `${client.emoji.cross} | Usage: \`${message.guild.prefix}tts cheerful diana hello akashsuu\`\n` +
+                            `Voices: \`f1/autumn\`, \`f2/diana\`, \`f3/hannah\`, \`m1/austin\`, \`m2/daniel\`, \`m3/troy\`\n` +
+                            `Emotions: \`cheerful\`, \`whisper\`, \`sad\`, \`angry\`, \`laughs\`, \`sighs\`, \`surprised\`, \`excited\`, \`crying\`, \`nervous\``
+                        )
                 ]
             })
         }
@@ -189,7 +239,7 @@ module.exports = {
                 apiKey,
                 model,
                 voice: groqVoice,
-                text
+                text: ttsInput
             })
             if (effectMode) {
                 try {
@@ -207,11 +257,11 @@ module.exports = {
             const embed = client.util.embed()
                 .setColor(client.color)
                 .setTitle('Text To Speech')
-                .setDescription(`Generated ${effectMode === 'alien' ? '**alien** ' : effectMode === 'ghost' ? '**ghost** ' : effectMode === 'man' ? '**man announcer** ' : effectMode === 'moan' ? '**dramatic groan** ' : effectMode ? '**mic-style** ' : hindiMode ? '**Hindi API** ' : '**API** '}voice for ${message.author}.`)
+                .setDescription(`Generated ${effectMode === 'alien' ? '**alien** ' : effectMode === 'ghost' ? '**ghost** ' : effectMode === 'man' ? '**man announcer** ' : effectMode === 'moan' ? '**dramatic groan** ' : effectMode ? '**mic-style** ' : hindiMode ? '**Hindi API** ' : emotionMode ? '**emotional** ' : '**API** '}voice for ${message.author}.`)
                 .addFields(
                     {
                         name: 'Voice',
-                        value: `\`${result.voice}\``,
+                        value: `\`${VOICE_LABELS[result.voice] || result.voice}\``,
                         inline: true
                     },
                     {
@@ -220,8 +270,8 @@ module.exports = {
                         inline: true
                     },
                     {
-                        name: 'Effect',
-                        value: `\`${result.effect || 'normal'}\``,
+                        name: 'Style',
+                        value: `\`${[emotionMode ? emotionMode.replace(/\[|\]/g, '') : null, result.effect || null].filter(Boolean).join(' + ') || 'normal'}\``,
                         inline: true
                     }
                 )

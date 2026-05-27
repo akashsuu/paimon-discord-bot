@@ -2,6 +2,7 @@ const { LavalinkManager } = require('lavalink-client')
 const { COMPONENTS_V2_FLAG, formatDuration, musicControls, musicPlayerComponents, trackName } = require('../structures/musicUtil')
 
 const truthy = (value) => ['1', 'true', 'yes', 'on'].includes(String(value || '').toLowerCase())
+const AUTO_LEAVE_MS = 60 * 1000
 const DEFAULT_PUBLIC_NODE = {
     id: 'serenetia',
     host: 'lavalinkv4.serenetia.com',
@@ -39,6 +40,89 @@ const resolveNode = (client) => {
     }
 }
 
+const isAutoplayEnabled = () => {
+    return !['0', 'false', 'off', 'no'].includes(String(process.env.MUSIC_AUTOPLAY || 'true').toLowerCase())
+}
+
+const clearLeaveTimer = (player) => {
+    const timer = player.getData?.('emptyVoiceTimer')
+    if (timer) clearTimeout(timer)
+    player.setData?.('emptyVoiceTimer', null)
+}
+
+const rememberSkippedTrack = (player, track) => {
+    const uri = track?.info?.uri
+    if (!uri) return
+
+    const skipped = player.getData?.('skippedAutoplayUris') || []
+    player.setData?.('skippedAutoplayUris', [uri, ...skipped.filter((item) => item !== uri)].slice(0, 20))
+}
+
+const getPlayerVoiceChannel = (client, player) => {
+    const guild = client.guilds.cache.get(player.guildId)
+    return guild?.channels.cache.get(player.voiceChannelId) || null
+}
+
+const hasHumanListeners = (client, player) => {
+    const channel = getPlayerVoiceChannel(client, player)
+    if (!channel) return false
+    return channel.members.filter((member) => !member.user.bot).size > 0
+}
+
+const scheduleEmptyVoiceLeave = (client, player, reason = 'Voice channel empty') => {
+    clearLeaveTimer(player)
+
+    const timer = setTimeout(() => {
+        const activePlayer = client.lavalink?.getPlayer(player.guildId)
+        if (!activePlayer) return
+        if (activePlayer.playing || activePlayer.queue?.tracks?.length) return
+        if (hasHumanListeners(client, activePlayer)) return
+
+        activePlayer.destroy(reason, true).catch((err) => {
+            client.logger?.log?.(`music empty voice destroy error: ${err.message}`, 'warn')
+        })
+    }, AUTO_LEAVE_MS)
+
+    player.setData?.('emptyVoiceTimer', timer)
+}
+
+const relatedQueries = (track) => {
+    const info = track?.info || {}
+    const title = String(info.title || '').replace(/\(.*?\)|\[.*?\]|official|video|audio|lyrics/gi, '').trim()
+    const author = String(info.author || '').trim()
+    return [
+        `${author} ${title} similar songs`,
+        `${author} ${title} radio`,
+        `${author} mix`,
+        `${title} mix`
+    ].map((query) => query.replace(/\s+/g, ' ').trim()).filter(Boolean)
+}
+
+const searchRelatedTrack = async (player, seedTrack) => {
+    const seedUri = seedTrack?.info?.uri
+    const seedTitle = String(seedTrack?.info?.title || '').toLowerCase()
+    const skippedUris = new Set(player.getData?.('skippedAutoplayUris') || [])
+    const requester = seedTrack?.requester || player.getData?.('autoplayRequester')
+    const sources = [
+        process.env.LAVALINK_SEARCH || 'ytmsearch',
+        'ytsearch',
+        'scsearch'
+    ].filter((source, index, array) => source && array.indexOf(source) === index)
+
+    for (const query of relatedQueries(seedTrack)) {
+        for (const source of sources) {
+            const result = await player.search({ query, source }, requester).catch(() => null)
+            const track = result?.tracks?.find((candidate) => {
+                const title = String(candidate?.info?.title || '').toLowerCase()
+                return candidate?.info?.uri !== seedUri && !skippedUris.has(candidate?.info?.uri) && title && title !== seedTitle
+            })
+            if (track) return track
+        }
+    }
+
+    return null
+}
+
 module.exports = async (client) => {
     const node = resolveNode(client)
 
@@ -69,9 +153,7 @@ module.exports = async (client) => {
                 autoReconnect: true,
                 destroyPlayer: false
             },
-            onEmptyQueue: {
-                destroyAfterMs: 30000
-            },
+            onEmptyQueue: {},
             volumeDecrementer: 0.75,
             useUnresolvedData: true
         },
@@ -123,6 +205,10 @@ module.exports = async (client) => {
     })
 
     client.lavalink.on('trackStart', (player, track) => {
+        clearLeaveTimer(player)
+        player.setData?.('autoplaySeedTrack', track)
+        if (track?.requester) player.setData?.('autoplayRequester', track.requester)
+
         if (player.getData?.('suppressNextTrackStartMessage')) {
             player.setData?.('suppressNextTrackStartMessage', undefined)
             return
@@ -203,6 +289,17 @@ module.exports = async (client) => {
             }
 
             if (action === 'music_skip') {
+                const current = player.queue.current
+                if (!player.queue?.tracks?.length && isAutoplayEnabled() && current) {
+                    rememberSkippedTrack(player, current)
+                    const nextTrack = await searchRelatedTrack(player, current)
+                    if (nextTrack) {
+                        player.queue.add(nextTrack)
+                        await player.skip()
+                        return interaction.reply({ content: 'Skipped autoplay and found another similar song.', ephemeral: true })
+                    }
+                }
+
                 await player.skip()
                 return interaction.reply({ content: 'Skipped.', ephemeral: true })
             }
@@ -283,13 +380,44 @@ module.exports = async (client) => {
         }
     })
 
-    client.lavalink.on('queueEnd', (player) => {
-        setTimeout(() => {
-            if (!player.playing && !player.queue?.tracks?.length) {
-                player.destroy('Queue ended', true).catch((err) => {
-                    client.logger?.log?.(`music queue destroy error: ${err.message}`, 'warn')
-                })
+    client.on('voiceStateUpdate', async (oldState, newState) => {
+        const channelId = oldState.channelId || newState.channelId
+        if (!channelId) return
+
+        const player = client.lavalink?.getPlayer(oldState.guild.id || newState.guild.id)
+        if (!player || player.voiceChannelId !== channelId) return
+
+        if (hasHumanListeners(client, player)) {
+            clearLeaveTimer(player)
+            return
+        }
+
+        scheduleEmptyVoiceLeave(client, player, 'Voice channel empty for 1 minute')
+    })
+
+    client.lavalink.on('queueEnd', async (player) => {
+        const seedTrack = player.getData?.('autoplaySeedTrack') || player.queue?.current
+
+        if (isAutoplayEnabled() && seedTrack) {
+            try {
+                const nextTrack = await searchRelatedTrack(player, seedTrack)
+                if (nextTrack) {
+                    nextTrack.pluginInfo = {
+                        ...(nextTrack.pluginInfo || {}),
+                        clientData: {
+                            ...(nextTrack.pluginInfo?.clientData || {}),
+                            autoplay: true
+                        }
+                    }
+                    player.queue.add(nextTrack)
+                    await player.play()
+                    return
+                }
+            } catch (err) {
+                client.logger?.log?.(`music autoplay failed: ${err.message}`, 'warn')
             }
-        }, 30000)
+        }
+
+        scheduleEmptyVoiceLeave(client, player, 'Queue ended and voice was empty for 1 minute')
     })
 }

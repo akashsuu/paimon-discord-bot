@@ -25,6 +25,8 @@ module.exports = {
         try {
             const player = await getOrCreatePlayer(client, message, voiceChannel)
             if (!player) return
+            player.setData?.('autoplayEnabled', true)
+            player.setData?.('autoplayRequester', message.author)
             const shouldStartPlayer = !player.playing && !player.paused
 
             const response = await searchTracks(player, query, message.author)
@@ -38,6 +40,7 @@ module.exports = {
             } else {
                 player.queue.add(response.tracks[0])
             }
+            player.setData?.('autoplaySeedTrack', response.tracks[0])
 
             if (shouldStartPlayer) {
                 player.setData?.('suppressNextTrackStartMessage', true)

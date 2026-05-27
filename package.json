@@ -27,7 +27,6 @@
         "phin": "^3.6.1",
         "pngjs": "^7.0.0",
         "quickmongo": "^5.1.2",
-        "screenshot-desktop": "^1.15.4",
         "twemoji-parser": "^14.0.0",
         "wait": "^0.4.2"
     },
