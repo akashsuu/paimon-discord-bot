@@ -2,6 +2,8 @@ const axios = require('axios')
 const { AttachmentBuilder } = require('discord.js')
 
 const DEFAULT_AUDIOCRAFT_API_URL = 'http://127.0.0.1:7868'
+const DEFAULT_AUDIOCRAFT_DURATION = 8
+const DEFAULT_AUDIOCRAFT_TIMEOUT_MS = 900000
 
 const cleanText = (value) => String(value || '').replace(/\s+/g, ' ').trim()
 
@@ -41,6 +43,7 @@ const getAudioCraftUrl = (client) => {
 }
 
 const createMusicWithAudioCraft = async ({ baseUrl, prompt, duration }) => {
+    const timeout = Number(process.env.AUDIOCRAFT_TIMEOUT_MS || DEFAULT_AUDIOCRAFT_TIMEOUT_MS)
     const response = await axios.post(
         `${baseUrl}/generate`,
         {
@@ -53,7 +56,7 @@ const createMusicWithAudioCraft = async ({ baseUrl, prompt, duration }) => {
                 'Content-Type': 'application/json'
             },
             responseType: 'arraybuffer',
-            timeout: 300000,
+            timeout,
             validateStatus: () => true
         }
     )
@@ -90,7 +93,7 @@ module.exports = {
 
         if (creatorActions.includes(action)) {
             const audioCraftUrl = getAudioCraftUrl(client)
-            const duration = Number(process.env.AUDIOCRAFT_DURATION || client.config.AUDIOCRAFT_DURATION || 20)
+            const duration = Number(process.env.AUDIOCRAFT_DURATION || client.config.AUDIOCRAFT_DURATION || DEFAULT_AUDIOCRAFT_DURATION)
             const input = cleanText(args.slice(1).join(' '))
             const mode = ['lyrics', 'lyric'].includes(action) ? 'lyrics' : 'create'
             const prefix = message.guild.prefix || client.config.PREFIX
@@ -161,7 +164,7 @@ module.exports = {
                         client.util.embed()
                             .setColor(client.color)
                             .setDescription(offline
-                                ? `${client.emoji.cross} | AudioCraft is not running at \`${audioCraftUrl}\`. Start it with \`python scripts/audiocraft_server.py\`, then try again.`
+                                ? `${client.emoji.cross} | AudioCraft is not running at \`${audioCraftUrl}\`. Start it from \`C:\\Users\\akash\\Desktop\\audiocraft\` with \`.venv-audiocraft\\Scripts\\python.exe scripts\\audiocraft_server.py\`, then try again.`
                                 : `${client.emoji.cross} | AudioCraft failed: \`${String(err.message || err).slice(0, 180)}\``)
                     ]
                 })
@@ -193,6 +196,7 @@ module.exports = {
             `\`${message.guild.prefix}queue [page]\` - Show the queue`,
             `\`${message.guild.prefix}nowplaying\` - Show current song`,
             `\`${message.guild.prefix}volume <1-150>\` - Change volume`,
+            `\`${message.guild.prefix}sound <sound>\` - Generate a sound effect with local AudioCraft`,
             `\`${message.guild.prefix}music lyrics <lyrics>\` - Generate music from lyrics with local AudioCraft`,
             `\`${message.guild.prefix}music create <prompt>\` - Generate music from a prompt with local AudioCraft`
         ]
@@ -214,6 +218,7 @@ module.exports = {
                                 `\`${message.guild.prefix}play faded alan walker\`\n` +
                                 `\`${message.guild.prefix}play https://youtu.be/...\`\n` +
                                 `\`${message.guild.prefix}volume 80\`\n` +
+                                `\`${message.guild.prefix}sound rain on window\`\n` +
                                 `\`${message.guild.prefix}music create cyberpunk song theme with lyrics\`\n` +
                                 `\`${message.guild.prefix}music lyrics I am lost in neon lights\``
                         },
