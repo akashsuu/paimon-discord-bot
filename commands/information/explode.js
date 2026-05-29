@@ -1,7 +1,7 @@
 const axios = require('axios')
 const { AttachmentBuilder } = require('discord.js')
 const { PNG } = require('pngjs')
-const GIFEncoder = require('gifencoder')
+const { GIFEncoder, quantize, applyPalette } = require('gifenc')
 const { parseGIF, decompressFrames } = require('gifuct-js')
 
 const requestHeaders = {
@@ -113,6 +113,12 @@ const drawCircularAvatar = (dest, avatar, frame) => {
     }
 }
 
+const writeGifFrame = (encoder, rgba, width, height, delay) => {
+    const palette = quantize(rgba, 256)
+    const indexed = applyPalette(rgba, palette)
+    encoder.writeFrame(indexed, width, height, { palette, delay })
+}
+
 module.exports = {
     name: 'explode',
     aliases: ['boom', 'explosion'],
@@ -136,12 +142,7 @@ module.exports = {
             })
             const avatar = PNG.sync.read(Buffer.from(response.data))
             const explosion = await loadExplosionGifFrames()
-            const encoder = new GIFEncoder(512, 512)
-
-            encoder.start()
-            encoder.setRepeat(0)
-            encoder.setDelay(70)
-            encoder.setQuality(8)
+            const encoder = GIFEncoder()
 
             for (let frame = 0; frame < 32; frame++) {
                 const data = Buffer.alloc(512 * 512 * 4)
@@ -153,12 +154,12 @@ module.exports = {
                     drawScaled(data, explosion.pixels, explosion.width, explosion.height, 56, 50, 400, 400, 'lighter')
                 }
 
-                encoder.addFrame(data)
+                writeGifFrame(encoder, data, 512, 512, 70)
             }
 
             encoder.finish()
 
-            const attachment = new AttachmentBuilder(encoder.out.getData(), {
+            const attachment = new AttachmentBuilder(Buffer.from(encoder.bytes()), {
                 name: 'explode.gif'
             })
             const embed = client.util.embed()

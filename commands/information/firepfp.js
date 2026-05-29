@@ -1,7 +1,7 @@
 const axios = require('axios')
 const { AttachmentBuilder } = require('discord.js')
 const { PNG } = require('pngjs')
-const GIFEncoder = require('gifencoder')
+const { GIFEncoder, quantize, applyPalette } = require('gifenc')
 const { parseGIF, decompressFrames } = require('gifuct-js')
 
 const fireGifUrl = 'http://clipart-library.com/img1/1563572.gif'
@@ -155,6 +155,12 @@ const drawFrame = (avatar, fire, frame) => {
     return data
 }
 
+const writeGifFrame = (encoder, rgba, width, height, delay) => {
+    const palette = quantize(rgba, 256)
+    const indexed = applyPalette(rgba, palette)
+    encoder.writeFrame(indexed, width, height, { palette, delay })
+}
+
 module.exports = {
     name: 'fire',
     aliases: ['firepfp', 'fireavatar', 'burnpfp', 'catchfire'],
@@ -178,20 +184,15 @@ module.exports = {
             })
             const avatar = PNG.sync.read(Buffer.from(response.data))
             const fire = await loadFireGifFrames()
-            const encoder = new GIFEncoder(512, 512)
-
-            encoder.start()
-            encoder.setRepeat(0)
-            encoder.setDelay(80)
-            encoder.setQuality(10)
+            const encoder = GIFEncoder()
 
             for (let frame = 0; frame < 24; frame++) {
-                encoder.addFrame(drawFrame(avatar, fire, frame))
+                writeGifFrame(encoder, drawFrame(avatar, fire, frame), 512, 512, 80)
             }
 
             encoder.finish()
 
-            const attachment = new AttachmentBuilder(encoder.out.getData(), {
+            const attachment = new AttachmentBuilder(Buffer.from(encoder.bytes()), {
                 name: 'firepfp.gif'
             })
 
