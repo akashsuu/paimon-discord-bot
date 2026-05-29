@@ -1,6 +1,6 @@
 const axios = require('axios')
 const { AttachmentBuilder } = require('discord.js')
-const { createCanvas, loadImage } = require('canvas')
+const { PNG } = require('pngjs')
 const GIFEncoder = require('gifencoder')
 const { parseGIF, decompressFrames } = require('gifuct-js')
 
@@ -30,84 +30,129 @@ const loadFireGifFrames = async () => {
     const width = frames.reduce((max, frame) => Math.max(max, frame.dims.left + frame.dims.width), 1)
     const height = frames.reduce((max, frame) => Math.max(max, frame.dims.top + frame.dims.height), 1)
 
-    return { frames, width, height }
+    return { frames, width, height, pixels: Buffer.alloc(width * height * 4) }
 }
 
-const createFireState = ({ width, height }) => {
-    const canvas = createCanvas(width, height)
-    return {
-        canvas,
-        ctx: canvas.getContext('2d')
+const setPixel = (data, width, x, y, r, g, b, a = 255) => {
+    if (x < 0 || y < 0 || x >= width || y >= data.length / 4 / width) return
+    const index = (y * width + x) * 4
+    data[index] = r
+    data[index + 1] = g
+    data[index + 2] = b
+    data[index + 3] = a
+}
+
+const blendPixel = (data, width, x, y, r, g, b, a, mode = 'normal') => {
+    if (x < 0 || y < 0 || x >= width || y >= data.length / 4 / width || a <= 0) return
+    const index = (y * width + x) * 4
+    const alpha = a / 255
+
+    if (mode === 'lighter') {
+        data[index] = Math.min(255, data[index] + r * alpha)
+        data[index + 1] = Math.min(255, data[index + 1] + g * alpha)
+        data[index + 2] = Math.min(255, data[index + 2] + b * alpha)
+        data[index + 3] = Math.max(data[index + 3], a)
+        return
+    }
+
+    data[index] = Math.round(r * alpha + data[index] * (1 - alpha))
+    data[index + 1] = Math.round(g * alpha + data[index + 1] * (1 - alpha))
+    data[index + 2] = Math.round(b * alpha + data[index + 2] * (1 - alpha))
+    data[index + 3] = Math.max(data[index + 3], a)
+}
+
+const fillBackground = (data, frame) => {
+    for (let y = 0; y < 512; y++) {
+        for (let x = 0; x < 512; x++) {
+            const dx = x - 256
+            const dy = y - 256
+            const distance = Math.min(1, Math.sqrt(dx * dx + dy * dy) / 360)
+            const pulse = 10 + Math.sin(frame * 0.65) * 8
+            setPixel(
+                data,
+                512,
+                x,
+                y,
+                Math.round(10 + (58 + pulse) * (1 - distance)),
+                Math.round(5 + 18 * (1 - distance)),
+                Math.round(4 + 5 * (1 - distance)),
+                255
+            )
+        }
     }
 }
 
-const drawRealFire = (ctx, fire, frameIndex) => {
-    const frame = fire.frames[frameIndex % fire.frames.length]
-    const imageData = fire.state.ctx.createImageData(frame.dims.width, frame.dims.height)
-    imageData.data.set(frame.patch)
-    fire.state.ctx.putImageData(imageData, frame.dims.left, frame.dims.top)
+const updateGifState = (source, frameIndex) => {
+    const frame = source.frames[frameIndex % source.frames.length]
+    source.pixels.fill(0)
 
-    ctx.save()
-    ctx.globalAlpha = 0.96
-    ctx.globalCompositeOperation = 'lighter'
-    ctx.drawImage(fire.state.canvas, -42, 156, 596, 386)
-    ctx.drawImage(fire.state.canvas, 56, -18, 400, 250)
-    ctx.restore()
-
-    if (frame.disposalType === 2) {
-        fire.state.ctx.clearRect(frame.dims.left, frame.dims.top, frame.dims.width, frame.dims.height)
+    for (let y = 0; y < frame.dims.height; y++) {
+        for (let x = 0; x < frame.dims.width; x++) {
+            const src = (y * frame.dims.width + x) * 4
+            const dest = ((frame.dims.top + y) * source.width + frame.dims.left + x) * 4
+            source.pixels[dest] = frame.patch[src]
+            source.pixels[dest + 1] = frame.patch[src + 1]
+            source.pixels[dest + 2] = frame.patch[src + 2]
+            source.pixels[dest + 3] = frame.patch[src + 3]
+        }
     }
 }
 
-const drawFrame = (ctx, avatar, fire, frame) => {
-    ctx.clearRect(0, 0, 512, 512)
+const drawScaled = (dest, source, sourceWidth, sourceHeight, dx, dy, dw, dh, mode = 'normal') => {
+    for (let y = 0; y < dh; y++) {
+        const sy = Math.floor((y / dh) * sourceHeight)
+        for (let x = 0; x < dw; x++) {
+            const sx = Math.floor((x / dw) * sourceWidth)
+            const src = (sy * sourceWidth + sx) * 4
+            blendPixel(dest, 512, dx + x, dy + y, source[src], source[src + 1], source[src + 2], source[src + 3], mode)
+        }
+    }
+}
 
-    const background = ctx.createRadialGradient(256, 260, 40, 256, 256, 360)
-    background.addColorStop(0, '#3a1008')
-    background.addColorStop(0.45, '#160806')
-    background.addColorStop(1, '#050505')
-    ctx.fillStyle = background
-    ctx.fillRect(0, 0, 512, 512)
+const drawCircularAvatar = (dest, avatar, frame) => {
+    const centerX = 256
+    const centerY = 214
+    const radius = 154
+    const size = 308
+    const startX = centerX - radius
+    const startY = centerY - radius
 
-    drawRealFire(ctx, fire, frame)
+    for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+            const px = startX + x
+            const py = startY + y
+            const dx = px - centerX
+            const dy = py - centerY
+            if (dx * dx + dy * dy > radius * radius) continue
 
-    ctx.save()
-    ctx.beginPath()
-    ctx.arc(256, 214, 154, 0, Math.PI * 2)
-    ctx.closePath()
-    ctx.shadowColor = '#ff5a00'
-    ctx.shadowBlur = 34 + Math.sin(frame * 0.8) * 10
-    ctx.fillStyle = '#ff6b00'
-    ctx.fill()
-    ctx.clip()
-    ctx.drawImage(avatar, 102, 60, 308, 308)
-    ctx.restore()
+            const sx = Math.floor((x / size) * avatar.width)
+            const sy = Math.floor((y / size) * avatar.height)
+            const src = (sy * avatar.width + sx) * 4
+            blendPixel(dest, 512, px, py, avatar.data[src], avatar.data[src + 1], avatar.data[src + 2], avatar.data[src + 3])
+        }
+    }
 
-    ctx.beginPath()
-    ctx.arc(256, 214, 158, 0, Math.PI * 2)
-    ctx.lineWidth = 10
-    ctx.strokeStyle = frame % 2 ? '#ffbf2e' : '#ff7900'
-    ctx.shadowColor = '#ff3d00'
-    ctx.shadowBlur = 18
-    ctx.stroke()
-    ctx.shadowBlur = 0
+    const pulse = Math.sin(frame * 0.75)
+    for (let y = -164; y <= 164; y++) {
+        for (let x = -164; x <= 164; x++) {
+            const distance = Math.sqrt(x * x + y * y)
+            if (distance >= 154 && distance <= 164) {
+                blendPixel(dest, 512, centerX + x, centerY + y, 255, pulse > 0 ? 191 : 121, 36, 220, 'lighter')
+            }
+        }
+    }
+}
 
-    drawRealFire(ctx, fire, frame + 7)
-
-    const heat = ctx.createLinearGradient(0, 120, 0, 512)
-    heat.addColorStop(0, 'rgba(255, 210, 90, 0.08)')
-    heat.addColorStop(0.55, `rgba(255, 77, 0, ${0.18 + Math.sin(frame * 0.7) * 0.08})`)
-    heat.addColorStop(1, 'rgba(0, 0, 0, 0.2)')
-    ctx.fillStyle = heat
-    ctx.fillRect(0, 0, 512, 512)
-
-    ctx.font = 'bold 34px Sans'
-    ctx.textAlign = 'center'
-    ctx.fillStyle = '#ffffff'
-    ctx.shadowColor = '#ff4a00'
-    ctx.shadowBlur = 12 + Math.sin(frame) * 4
-    ctx.fillText('ON FIRE', 256, 455)
-    ctx.shadowBlur = 0
+const drawFrame = (avatar, fire, frame) => {
+    const data = Buffer.alloc(512 * 512 * 4)
+    fillBackground(data, frame)
+    updateGifState(fire, frame)
+    drawScaled(data, fire.pixels, fire.width, fire.height, -42, 156, 596, 386, 'lighter')
+    drawScaled(data, fire.pixels, fire.width, fire.height, 56, -18, 400, 250, 'lighter')
+    drawCircularAvatar(data, avatar, frame)
+    drawScaled(data, fire.pixels, fire.width, fire.height, -42, 156, 596, 386, 'lighter')
+    drawScaled(data, fire.pixels, fire.width, fire.height, 56, -18, 400, 250, 'lighter')
+    return data
 }
 
 module.exports = {
@@ -131,15 +176,8 @@ module.exports = {
                 responseType: 'arraybuffer',
                 timeout: 10000
             })
-            const avatar = await loadImage(Buffer.from(response.data))
-            const fireSource = await loadFireGifFrames()
-            const fire = {
-                ...fireSource,
-                state: createFireState(fireSource)
-            }
-
-            const canvas = createCanvas(512, 512)
-            const ctx = canvas.getContext('2d')
+            const avatar = PNG.sync.read(Buffer.from(response.data))
+            const fire = await loadFireGifFrames()
             const encoder = new GIFEncoder(512, 512)
 
             encoder.start()
@@ -148,8 +186,7 @@ module.exports = {
             encoder.setQuality(10)
 
             for (let frame = 0; frame < 24; frame++) {
-                drawFrame(ctx, avatar, fire, frame)
-                encoder.addFrame(ctx)
+                encoder.addFrame(drawFrame(avatar, fire, frame))
             }
 
             encoder.finish()
@@ -170,6 +207,7 @@ module.exports = {
 
             return message.channel.send({ embeds: [embed], files: [attachment] })
         } catch (err) {
+            client.logger?.log?.(`fire pfp failed: ${err.message}`, 'error')
             return message.channel.send({
                 embeds: [
                     client.util.embed()
