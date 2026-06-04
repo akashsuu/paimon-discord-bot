@@ -859,9 +859,10 @@ module.exports = async (client) => {
 
   
 
-            let customdata = await client.db.get(
-                `customrole_${message.guild.id}`
-            )
+            const customRoleCommandsEnabled = false
+            let customdata = customRoleCommandsEnabled
+                ? await client.db.get(`customrole_${message.guild.id}`)
+                : null
             if (customdata) {
                 for (const [index, data] of customdata.names.entries()) {
                     if (

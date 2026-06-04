@@ -9,6 +9,67 @@ const { Database } = require('quickmongo')
 const axios = require('axios')
 const { ClusterClient, getInfo } = require('discord-hybrid-sharding');
 
+const DISABLED_COMMAND_MODULES = new Set([
+    'antinuke',
+    'automod',
+    'autoresponder',
+    'coustomrole',
+    'jointocreate',
+    'premium',
+    'sticky',
+    'ticket',
+    'verification',
+    'welcomer'
+])
+
+const DISABLED_COMMAND_NAMES = new Set([
+    'jointocreate',
+    'premium'
+])
+
+const DISABLED_EVENT_FILES = new Set([
+    'antiAutomodeRuleCreate.js',
+    'antiAutomodeRuleDelete.js',
+    'antiAutomodeRuleUpdate.js',
+    'antiban.js',
+    'antibotadd.js',
+    'antichannelcreate.js',
+    'antichanneldelete.js',
+    'antichanneluptdate.js',
+    'antiemojicreate.js',
+    'antiemojidelete.js',
+    'antiemojiupdate.js',
+    'antieveryone.js',
+    'antiguildScheduledEventCreate.js',
+    'antiguildScheduledEventDelete.js',
+    'antiguildScheduledEventUpdate.js',
+    'antiguildupdate.js',
+    'antiIntegration.js',
+    'antiinvitedelete.js',
+    'antikick.js',
+    'antimemberupdate.js',
+    'antiprune.js',
+    'antirolecreate.js',
+    'antiroledelete.js',
+    'antiroleping.js',
+    'antiroleupdate.js',
+    'antistickercreate.js',
+    'antistickerdelete.js',
+    'antistickerupdate.js',
+    'antiunban.js',
+    'antiwebhookcreate.js',
+    'antiwebhookdelete.js',
+    'antiwebhookupdate.js',
+    'automod.js',
+    'guildMemberAdd.js',
+    'invcrole.js',
+    'joingate.js',
+    'statusrole.js',
+    'ticketsystem.js',
+    'util.js',
+    'vcgen.js'
+])
+
 function resolveClusterInfo() {
     try {
         return getInfo()
@@ -115,7 +176,9 @@ module.exports = class Akashsuu extends Client {
         )
         this.logger = require('./logger')
         this.commands = new Collection()
-        this.categories = fs.readdirSync('./commands/')
+        this.categories = fs
+            .readdirSync('./commands/')
+            .filter((directory) => !DISABLED_COMMAND_MODULES.has(directory.toLowerCase()))
         this.util = new Utils(this)
         this.color = 0xffffff
         this.support = `https://discord.gg/64ZptNjsar`
@@ -252,6 +315,10 @@ module.exports = class Akashsuu extends Client {
     async loadEvents() {
         fs.readdirSync('./events/').forEach((file) => {
             if (file.endsWith('.js')) {
+                if (DISABLED_EVENT_FILES.has(file)) {
+                    this.logger.log(`Skipped disabled Event ${file.split('.')[0]}.`, 'warn')
+                    return
+                }
                 let eventName = file.split('.')[0]
                 try {
                     require(`${process.cwd()}/events/${file}`)(this)
@@ -284,6 +351,11 @@ module.exports = class Akashsuu extends Client {
 
         const commandDirectories = fs.readdirSync(`${process.cwd()}/commands`)
         for (const directory of commandDirectories) {
+            if (DISABLED_COMMAND_MODULES.has(directory.toLowerCase())) {
+                this.logger.log(`Skipped disabled Command Module ${directory}.`, 'warn')
+                continue
+            }
+
             const files = fs
                 .readdirSync(`${process.cwd()}/commands/${directory}`)
                 .filter((file) => file.endsWith('.js'))
@@ -299,7 +371,7 @@ module.exports = class Akashsuu extends Client {
                 const file = require(value)
                 const splitted = value.split(/[\\/]/)
                 const directory = splitted[splitted.length - 2]
-                if (file.name) {
+                if (file.name && !DISABLED_COMMAND_NAMES.has(String(file.name).toLowerCase())) {
                     const properties = { directory, ...file }
                     this.commands.set(file.name, properties)
                 }

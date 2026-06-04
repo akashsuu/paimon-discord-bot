@@ -15,22 +15,13 @@ module.exports = {
         })
 
         const commandGroups = [
-            { label: 'AntiNuke', description: 'Security, whitelist, panic and protection', value: 'antinuke', emoji: client.emoji.antinuke },
             { label: 'Moderation', description: 'Ban, mute, purge and server control', value: 'moderation', emoji: client.emoji.mod },
-            { label: 'Automod', description: 'Auto filters, anti spam and safe chat', value: 'automod', emoji: client.emoji.automod },
             { label: 'Logger', description: 'Server logs and event tracking', value: 'logger', emoji: client.emoji.logs },
             { label: 'Utility', description: 'Info, AI tools, translate, avatar and stats', value: 'utility', emoji: client.emoji.utillity },
             { label: 'Server Utility', description: 'Leaderboards and server helpers', value: 'serverutility', emoji: client.emoji.serverutillity },
-            { label: 'Auto Responder', description: 'Custom automatic replies', value: 'autoresponder', emoji: client.emoji.autoresponder },
             { label: 'Fun', description: 'Games, rates, gifs and chaos', value: 'fun', emoji: client.emoji.fun },
             { label: 'Music', description: 'Lavalink player, queue and voice music', value: 'music', emoji: client.emoji.vc },
-            { label: 'Verification', description: 'Verify users and protect joins', value: 'verification', emoji: client.emoji.verification },
-            { label: 'Join To Create', description: 'Temporary voice channel system', value: 'jointocreate', emoji: client.emoji.jtc },
             { label: 'Voice & TTS', description: 'Voice moderation, music, TTS and voice tools', value: 'voice', emoji: client.emoji.vc },
-            { label: 'Custom Role', description: 'User custom role setup', value: 'customrole', emoji: client.emoji.customrole },
-            { label: 'Welcomer', description: 'Welcome messages, autoroles and tests', value: 'welcomer', emoji: client.emoji.welcome },
-            { label: 'Sticky', description: 'Sticky messages and channel notes', value: 'sticky', emoji: client.emoji.sticky },
-            { label: 'Ticket', description: 'Ticket panels and support flows', value: 'ticket', emoji: client.emoji.ticket },
             { label: 'Owner Tools', description: 'Owner, premium and developer controls', value: 'owner', emoji: client.emoji.owner || client.emoji.developer || client.emoji.utillity }
         ]
 
