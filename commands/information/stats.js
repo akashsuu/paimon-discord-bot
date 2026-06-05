@@ -76,10 +76,14 @@ module.exports = {
 
             if (i.isButton()) {
                 if (i.customId == 'latencyGraph') {
-                    i.deferUpdate();
-                    let db = await client.db.ping()
-                    const uri = await client.util.generateLatencyChart(client.ws.ping, db);
-                    const graphEmbed = client.util.embed().setColor(client.color).setDescription('This graph represents the latency between the bot and the database, alongside the WebSocket ping. A lower value indicates better performance.').setFooter({
+                    await i.deferUpdate().catch(() => null);
+                    const websocketPing = Number.isFinite(Number(client.ws.ping)) ? Math.round(Number(client.ws.ping)) : 0;
+                    const db = typeof client.db?.ping === 'function'
+                        ? await client.db.ping().catch(() => null)
+                        : null;
+                    const databasePing = Number.isFinite(Number(db)) ? Math.round(Number(db)) : 0;
+                    const uri = await client.util.generateLatencyChart(websocketPing, databasePing);
+                    const graphEmbed = client.util.embed().setColor(client.color).setDescription(`**WebSocket:** ${websocketPing}ms\n**Database:** ${databasePing ? `${databasePing}ms` : 'Unavailable'}\n\nLower latency means faster bot response.`).setFooter({
                         text: `Requested by ${message.author.tag} | Latency Overview`,
                         iconURL: message.author.displayAvatarURL({ dynamic: true }),
                     })

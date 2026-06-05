@@ -1393,6 +1393,63 @@ module.exports = class Util {
         return `\`\`\`${type}\n${text}\`\`\``
     }
 
+    async generateLatencyChart(websocketPing, databasePing) {
+        const ws = Number.isFinite(Number(websocketPing))
+            ? Math.max(0, Math.round(Number(websocketPing)))
+            : 0
+        const db = Number.isFinite(Number(databasePing))
+            ? Math.max(0, Math.round(Number(databasePing)))
+            : 0
+        const max = Math.max(ws, db, 100)
+
+        const chart = {
+            type: 'bar',
+            data: {
+                labels: ['WebSocket', 'Database'],
+                datasets: [{
+                    label: 'Latency ms',
+                    data: [ws, db],
+                    backgroundColor: ['#ffffff', '#8fd3ff'],
+                    borderColor: ['#ffffff', '#8fd3ff'],
+                    borderWidth: 2,
+                    borderRadius: 8
+                }]
+            },
+            options: {
+                plugins: {
+                    legend: { display: false },
+                    title: {
+                        display: true,
+                        text: 'akashsuu Latency',
+                        color: '#ffffff',
+                        font: { size: 22, weight: 'bold' }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: { color: '#ffffff', font: { size: 14, weight: 'bold' } },
+                        grid: { color: 'rgba(255,255,255,0.08)' }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        suggestedMax: max + 50,
+                        ticks: { color: '#ffffff' },
+                        grid: { color: 'rgba(255,255,255,0.12)' }
+                    }
+                }
+            }
+        }
+
+        const params = new URLSearchParams({
+            width: '760',
+            height: '360',
+            backgroundColor: '#23232a',
+            c: JSON.stringify(chart)
+        })
+
+        return `https://quickchart.io/chart?${params.toString()}`
+    }
+
     async haste(text) {
         const req = await this.client.snek.post(
             'https://haste.ntmnathan.com/documents',
