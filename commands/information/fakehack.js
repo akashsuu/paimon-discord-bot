@@ -1,6 +1,23 @@
 const axios = require('axios')
+const crypto = require('crypto')
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+const randomTokenPart = (length) => crypto.randomBytes(length)
+    .toString('base64url')
+    .slice(0, length)
+const randomUpper = () => String.fromCharCode(65 + Math.floor(Math.random() * 26))
+const fakeDiscordToken = () => {
+    const prefix = `${Math.random() < 0.5 ? 'MT' : 'OD'}${randomUpper()}`
+    return `${prefix}${randomTokenPart(21)}.${randomTokenPart(6)}.${randomTokenPart(38)}`
+}
+
+const cleanEmailName = (username, fallback) => {
+    const clean = String(username || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9._]/g, '')
+        .replace(/^\.+|\.+$/g, '')
+    return clean || fallback
+}
 
 module.exports = {
     name: 'hack',
@@ -9,25 +26,27 @@ module.exports = {
     premium: true,
     run: async (client, message) => {
         const target = message.mentions.users.first() || message.author
+        const targetMember = message.mentions.members.first() || message.member
+        const targetDisplayName = targetMember?.displayName || target.globalName || target.username
+        const targetUsername = target.username
+        const targetEmailName = cleanEmailName(targetUsername, target.id)
 
         try {
             const response = await axios.get('https://randomuser.me/api/', {
                 timeout: 10000
-            })
-            const profile = response.data?.results?.[0]
+            }).catch(() => null)
+            const profile = response?.data?.results?.[0]
 
-            if (!profile) {
-                throw new Error('Hack API returned an invalid response')
-            }
-
-            const fakeEmail = profile.email
+            const fakeEmail = `${targetEmailName}@gmail.com`
             const fakeIp = `${Math.floor(Math.random() * 223) + 1}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`
-            const fakePassword = `${profile.login.username}_${Math.floor(Math.random() * 9000) + 1000}`
-            const fakeName = `${profile.name.first} ${profile.name.last}`
-            const fakeUsername = profile.login.username
-            const fakePhone = profile.phone
-            const fakeLocation = `${profile.location.city}, ${profile.location.country}`
-            const fakeToken = Buffer.from(`${fakeUsername}:${Date.now()}`).toString('base64').slice(0, 32)
+            const fakePassword = `${targetUsername}_${Math.floor(Math.random() * 9000) + 1000}`
+            const fakeName = targetDisplayName
+            const fakeUsername = targetUsername
+            const fakePhone = profile?.phone || `+91 ${Math.floor(Math.random() * 90000) + 10000}-${Math.floor(Math.random() * 90000) + 10000}`
+            const fakeLocation = profile?.location
+                ? `${profile.location.city}, ${profile.location.country}`
+                : 'Unknown Discord sector'
+            const fakeToken = fakeDiscordToken()
 
             const embed = client.util.embed()
                 .setColor(client.color)
