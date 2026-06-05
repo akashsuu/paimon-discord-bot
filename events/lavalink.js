@@ -4,10 +4,10 @@ const { COMPONENTS_V2_FLAG, formatDuration, musicControls, musicPlayerComponents
 const truthy = (value) => ['1', 'true', 'yes', 'on'].includes(String(value || '').toLowerCase())
 const AUTO_LEAVE_MS = 60 * 1000
 const DEFAULT_PUBLIC_NODE = {
-    id: 'serenetia',
-    host: 'lavalinkv4.serenetia.com',
+    id: 'jirayu',
+    host: 'lavalink.jirayu.net',
     port: 443,
-    authorization: 'https://seretia.link/discord',
+    authorization: 'youshallnotpass',
     secure: true,
     requestSignalTimeoutMS: 30000
 }

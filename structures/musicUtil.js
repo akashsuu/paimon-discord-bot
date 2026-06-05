@@ -3,10 +3,10 @@ const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js')
 const URL_REGEX = /^https?:\/\//i
 const COMPONENTS_V2_FLAG = 1 << 15
 const DEFAULT_PUBLIC_NODE = {
-    id: 'serenetia',
-    host: 'lavalinkv4.serenetia.com',
+    id: 'jirayu',
+    host: 'lavalink.jirayu.net',
     port: 443,
-    authorization: 'https://seretia.link/discord',
+    authorization: 'youshallnotpass',
     secure: true,
     requestSignalTimeoutMS: 30000,
     retryAmount: 5,
