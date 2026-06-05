@@ -54,17 +54,28 @@ const normalizeTitle = (value) => {
     return String(value || '')
         .toLowerCase()
         .replace(/\([^)]*\)|\[[^\]]*\]/g, ' ')
-        .replace(/\b(official|music|video|audio|lyrics?|lyric|visualizer|mv|hd|4k|remaster(?:ed)?|live|topic|provided to youtube by|slowed|reverb|sped up|nightcore|extended|version)\b/g, ' ')
+        .replace(/\b(official|music|video|audio|lyrics?|lyric|visualizer|mv|hd|4k|remaster(?:ed)?|live|topic|provided to youtube by|slowed|reverb|sped up|nightcore|extended|version|remix|mix|edit|cover|karaoke|instrumental|lofi|bass boosted|8d)\b/g, ' ')
         .replace(/\b(ft|feat|featuring)\.?\s+.+$/g, ' ')
         .replace(/[^a-z0-9]+/g, ' ')
         .replace(/\s+/g, ' ')
         .trim()
 }
 
+const TITLE_STOP_WORDS = new Set(['the', 'a', 'an', 'and', 'or', 'to', 'of', 'in', 'on', 'for', 'with', 'by', 'from'])
+
+const shuffleArray = (items) => {
+    const shuffled = [...items]
+    for (let index = shuffled.length - 1; index > 0; index -= 1) {
+        const swapIndex = Math.floor(Math.random() * (index + 1))
+        ;[shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]]
+    }
+    return shuffled
+}
+
 const titleTokens = (value) => {
     return normalizeTitle(value)
         .split(' ')
-        .filter((token) => token.length > 1)
+        .filter((token) => token.length > 1 && !TITLE_STOP_WORDS.has(token))
 }
 
 const tokenOverlap = (left, right) => {
@@ -85,7 +96,14 @@ const isSameSongTitle = (leftTitle, rightTitle) => {
     if (leftText.length >= 4 && rightText.includes(leftText)) return true
     if (rightText.length >= 4 && leftText.includes(rightText)) return true
 
-    return tokenOverlap(left, right) >= 0.8
+    return tokenOverlap(left, right) >= 0.55
+}
+
+const sameArtist = (leftAuthor, rightAuthor) => {
+    const left = normalizeTitle(leftAuthor)
+    const right = normalizeTitle(rightAuthor)
+    if (!left || !right) return false
+    return left === right || left.includes(right) || right.includes(left)
 }
 
 const recentAutoplayTitles = (player) => player.getData?.('recentAutoplayTitles') || []
@@ -139,13 +157,16 @@ const scheduleEmptyVoiceLeave = (client, player, reason = 'Voice channel empty')
 
 const relatedQueries = (track) => {
     const info = track?.info || {}
-    const title = String(info.title || '').replace(/\(.*?\)|\[.*?\]|official|video|audio|lyrics/gi, '').trim()
+    const title = String(info.title || '').replace(/\(.*?\)|\[.*?\]|official|video|audio|lyrics|remix|cover|edit/gi, '').trim()
     const author = String(info.author || '').trim()
     return [
-        `${author} ${title} similar songs`,
         `${author} ${title} radio`,
-        `${author} mix`,
-        `${title} mix`
+        `${author} radio`,
+        `${author} similar artists`,
+        `${title} song radio`,
+        `${title} similar songs`,
+        'spotify radio hits',
+        'spotify daily mix'
     ].map((query) => query.replace(/\s+/g, ' ').trim()).filter(Boolean)
 }
 
@@ -156,27 +177,29 @@ const searchRelatedTrack = async (player, seedTrack) => {
     const recentTitles = recentAutoplayTitles(player)
     const requester = seedTrack?.requester || player.getData?.('autoplayRequester')
     const sources = [
+        'spsearch',
         process.env.LAVALINK_SEARCH || 'ytmsearch',
         'ytsearch',
         'scsearch'
     ].filter((source, index, array) => source && array.indexOf(source) === index)
+    const candidates = []
 
-    for (const query of relatedQueries(seedTrack)) {
-        for (const source of sources) {
+    for (const query of shuffleArray(relatedQueries(seedTrack))) {
+        for (const source of shuffleArray(sources)) {
             const result = await player.search({ query, source }, requester).catch(() => null)
-            const track = result?.tracks?.find((candidate) => {
+            for (const candidate of shuffleArray(result?.tracks || []).slice(0, 10)) {
                 const title = candidate?.info?.title
-                if (!title || candidate?.info?.uri === seedUri || skippedUris.has(candidate?.info?.uri)) return false
-                if (isSameSongTitle(seedTrack?.info?.title, title)) return false
-                if (skippedTitles.some((skippedTitle) => isSameSongTitle(skippedTitle, title))) return false
-                if (recentTitles.some((recentTitle) => isSameSongTitle(recentTitle, title))) return false
-                return true
-            })
-            if (track) return track
+                if (!title || candidate?.info?.uri === seedUri || skippedUris.has(candidate?.info?.uri)) continue
+                if (isSameSongTitle(seedTrack?.info?.title, title)) continue
+                if (sameArtist(seedTrack?.info?.author, candidate?.info?.author) && tokenOverlap(titleTokens(seedTrack?.info?.title), titleTokens(title)) >= 0.35) continue
+                if (skippedTitles.some((skippedTitle) => isSameSongTitle(skippedTitle, title))) continue
+                if (recentTitles.some((recentTitle) => isSameSongTitle(recentTitle, title))) continue
+                candidates.push(candidate)
+            }
         }
     }
 
-    return null
+    return shuffleArray(candidates)[0] || null
 }
 
 module.exports = async (client) => {
