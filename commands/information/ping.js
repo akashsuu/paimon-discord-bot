@@ -51,7 +51,7 @@ module.exports = {
                 { name: 'Status', value: `\`${status}\``, inline: true }
             )
             .setFooter({
-                text: 'No fake ping. These values are measured live.',
+                text: 'ping',
                 iconURL: client.user.displayAvatarURL()
             })
             .setTimestamp()
@@ -59,4 +59,3 @@ module.exports = {
         return reply.edit({ embeds: [embed] })
     }
 }
-
