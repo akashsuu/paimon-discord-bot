@@ -1,7 +1,6 @@
 const axios = require('axios')
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
-const DEFAULT_MODEL = 'llama-3.3-70b-versatile'
 
 const cleanText = (value) => String(value || '').replace(/\s+/g, ' ').trim()
 
@@ -52,7 +51,7 @@ module.exports = {
     premium: true,
     run: async (client, message, args) => {
         const apiKey = process.env.GROQ_API_KEY || client.config.GROQ_API_KEY
-        const model = process.env.GROQ_MODEL || client.config.GROQ_MODEL || DEFAULT_MODEL
+        const model = process.env.GROQ_MODEL || client.config.GROQ_MODEL
         const target = message.mentions.users.first() || message.author
         const context = cleanText(args.filter((arg) => !/^<@!?(\d+)>$/.test(arg)).join(' '))
 
@@ -62,6 +61,16 @@ module.exports = {
                     client.util.embed()
                         .setColor(client.color)
                         .setDescription(`${client.emoji.cross} | Missing \`GROQ_API_KEY\`. Add it to your \`.env\` file and restart the bot.`)
+                ]
+            })
+        }
+
+        if (!model) {
+            return message.channel.send({
+                embeds: [
+                    client.util.embed()
+                        .setColor(client.color)
+                        .setDescription(`${client.emoji.cross} | Missing \`GROQ_MODEL\`. Add it to your \`.env\` file and restart the bot.`)
                 ]
             })
         }
@@ -91,7 +100,7 @@ module.exports = {
                 .setDescription(roast)
                 .setThumbnail(target.displayAvatarURL({ dynamic: true }))
                 .setFooter({
-                    text: `akashsuu roast | ${model}`,
+                    text: 'akashsuu roast',
                     iconURL: client.user.displayAvatarURL({ dynamic: true })
                 })
 

@@ -1,6 +1,13 @@
 const axios = require('axios')
 const { AttachmentBuilder } = require('discord.js')
-const { createCanvas, loadImage } = require('canvas')
+
+const getCanvas = () => {
+    try {
+        return require('canvas')
+    } catch (err) {
+        return null
+    }
+}
 
 const templates = [
     {
@@ -39,7 +46,7 @@ const getUserFromMention = async (message, mention) => {
     return message.guild.members.fetch(matches[1]).catch(() => null)
 }
 
-const loadTemplate = async (template) => {
+const loadTemplate = async (template, loadImage) => {
     if (cachedTemplates.has(template.id)) return cachedTemplates.get(template.id)
 
     const response = await axios.get(template.url, {
@@ -53,9 +60,27 @@ const loadTemplate = async (template) => {
     return image
 }
 
+const pickWorkingTemplate = async (loadImage) => {
+    const shuffled = [...templates].sort(() => Math.random() - 0.5)
+    let lastError
+
+    for (const template of shuffled) {
+        try {
+            return {
+                selectedTemplate: template,
+                template: await loadTemplate(template, loadImage)
+            }
+        } catch (err) {
+            lastError = err
+        }
+    }
+
+    throw lastError || new Error('No template image could be loaded')
+}
+
 module.exports = {
-    name: 'famboy',
-    aliases: ['femboy'],
+    name: 'femboy',
+    aliases: ['famboy'],
     category: 'fun',
     premium: true,
     run: async (client, message, args) => {
@@ -64,19 +89,23 @@ module.exports = {
             message.member
 
         try {
-            const selectedTemplate = templates[Math.floor(Math.random() * templates.length)]
-            const [template, avatarResponse] = await Promise.all([
-                loadTemplate(selectedTemplate),
-                axios.get(member.user.displayAvatarURL({
-                    extension: 'png',
-                    size: 256,
-                    forceStatic: true
-                }), {
-                    headers: requestHeaders,
-                    responseType: 'arraybuffer',
-                    timeout: 10000
-                })
-            ])
+            const canvasLib = getCanvas()
+            if (!canvasLib) {
+                throw new Error('canvas package is not installed or failed to load')
+            }
+
+            const { createCanvas, loadImage } = canvasLib
+            const templateData = await pickWorkingTemplate(loadImage)
+            const { selectedTemplate, template } = templateData
+            const avatarResponse = await axios.get(member.user.displayAvatarURL({
+                extension: 'png',
+                size: 256,
+                forceStatic: true
+            }), {
+                headers: requestHeaders,
+                responseType: 'arraybuffer',
+                timeout: 10000
+            })
             const avatar = await loadImage(Buffer.from(avatarResponse.data))
             const canvas = createCanvas(template.width, template.height)
             const ctx = canvas.getContext('2d')
@@ -104,14 +133,14 @@ module.exports = {
             ctx.shadowBlur = 0
 
             const attachment = new AttachmentBuilder(canvas.toBuffer('image/png'), {
-                name: 'famboy.png'
+                name: 'femboy.png'
             })
 
             const embed = client.util.embed()
                 .setColor(client.color)
-                .setTitle('Famboy')
+                .setTitle('Femboy')
                 .setDescription(`**${member.displayName}** got the look.`)
-                .setImage('attachment://famboy.png')
+                .setImage('attachment://femboy.png')
                 .setFooter({
                     text: 'akashsuu',
                     iconURL: client.user.displayAvatarURL({ dynamic: true })
@@ -119,11 +148,12 @@ module.exports = {
 
             return message.channel.send({ embeds: [embed], files: [attachment] })
         } catch (err) {
+            client.logger?.log?.(`femboy command failed: ${err.message}`, 'error')
             return message.channel.send({
                 embeds: [
                     client.util.embed()
                         .setColor(client.color)
-                        .setDescription(`${client.emoji.cross} | famboy image generator failed.`)
+                        .setDescription(`${client.emoji.cross} | femboy image generator failed: ${err.message}`)
                 ]
             })
         }

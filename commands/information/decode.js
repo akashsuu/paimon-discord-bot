@@ -2,7 +2,6 @@ const axios = require('axios')
 
 const DEFAULT_LOCAL_URL = 'http://127.0.0.1:1234'
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
-const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile'
 
 const cleanText = (value) => String(value || '').replace(/\s+/g, ' ').trim()
 
@@ -127,7 +126,8 @@ const askGroq = async ({ client, text }) => {
     const apiKey = process.env.GROQ_API_KEY || client.config.GROQ_API_KEY
     if (!apiKey) return null
 
-    const model = process.env.GROQ_MODEL || client.config.GROQ_MODEL || DEFAULT_GROQ_MODEL
+    const model = process.env.GROQ_MODEL || client.config.GROQ_MODEL
+    if (!model) return null
     const response = await axios.post(
         GROQ_URL,
         {
@@ -188,14 +188,14 @@ module.exports = {
         await message.channel.sendTyping().catch(() => null)
 
         let decoded
-        let modelLabel = 'local model'
+        let modelLabel = 'AI decoder'
         const baseUrl = getLocalBaseUrl(client)
 
         try {
             const model = process.env.LOCAL_CHATBOT_MODEL || process.env.OLLAMA_MODEL || client.config.LOCAL_CHATBOT_MODEL || client.config.OLLAMA_MODEL || await getFirstModel(client, baseUrl)
             if (model) {
                 decoded = await askLocalModel({ client, baseUrl, model, text })
-                modelLabel = `Local model: ${model}`
+                modelLabel = 'AI decoder'
             }
         } catch (err) {
             client.logger?.log?.(`decode local model skipped: ${err.response?.data?.error || err.message}`, 'warn')
@@ -205,7 +205,7 @@ module.exports = {
             try {
                 const groq = await askGroq({ client, text })
                 decoded = groq?.decoded
-                if (groq?.model) modelLabel = `Groq: ${groq.model}`
+                if (groq?.model) modelLabel = 'AI decoder'
             } catch (err) {
                 client.logger?.log?.(`decode groq error: ${err.response?.data?.error?.message || err.message}`, 'error')
             }
