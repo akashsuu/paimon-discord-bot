@@ -3,11 +3,11 @@ const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js')
 const URL_REGEX = /^https?:\/\//i
 const COMPONENTS_V2_FLAG = 1 << 15
 const DEFAULT_PUBLIC_NODE = {
-    id: 'jirayu',
-    host: 'lavalink.jirayu.net',
-    port: 443,
-    authorization: 'youshallnotpass',
-    secure: true,
+    id: 'nexcloud',
+    host: 'n3.nexcloud.in',
+    port: 2026,
+    authorization: 'nexcloud',
+    secure: false,
     requestSignalTimeoutMS: 30000,
     retryAmount: 5,
     retryDelay: 10000

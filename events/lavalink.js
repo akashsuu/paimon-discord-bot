@@ -4,11 +4,11 @@ const { COMPONENTS_V2_FLAG, formatDuration, musicControls, musicPlayerComponents
 const truthy = (value) => ['1', 'true', 'yes', 'on'].includes(String(value || '').toLowerCase())
 const AUTO_LEAVE_MS = 60 * 1000
 const DEFAULT_PUBLIC_NODE = {
-    id: 'jirayu',
-    host: 'lavalink.jirayu.net',
-    port: 443,
-    authorization: 'youshallnotpass',
-    secure: true,
+    id: 'nexcloud',
+    host: 'n3.nexcloud.in',
+    port: 2026,
+    authorization: 'nexcloud',
+    secure: false,
     requestSignalTimeoutMS: 30000
 }
 
