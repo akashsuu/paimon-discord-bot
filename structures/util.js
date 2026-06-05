@@ -324,6 +324,19 @@ module.exports = class Util {
                 serverutility: { title: 'Server Utility', emoji: interaction.client.emoji.serverutillity, categories: ['leaderboard'] },
                 autoresponder: { title: 'Auto Responder', emoji: interaction.client.emoji.autoresponder, categories: ['autoresponder'] },
                 fun: { title: 'Fun', emoji: interaction.client.emoji.fun, categories: ['fun'] },
+                gif: {
+                    title: 'Gif',
+                    emoji: interaction.client.emoji.fun,
+                    categories: [],
+                    commands: [
+                        'neko', 'waifu', 'kitsune', 'husbando',
+                        'hug', 'kiss', 'pat', 'cuddle', 'slap', 'poke', 'tickle', 'feed', 'handhold', 'highfive',
+                        'wave', 'wink', 'yeet', 'kick', 'punch', 'bite', 'peck', 'nom',
+                        'smile', 'blush', 'cry', 'happy', 'laugh', 'baka', 'bored', 'pout', 'facepalm', 'shrug',
+                        'stare', 'think', 'sip', 'sleep', 'lurk', 'shoot',
+                        'dance', 'jump', 'nope', 'yawn', 'confused', 'scared', 'angry', 'smug'
+                    ]
+                },
                 music: { title: 'Music', emoji: interaction.client.emoji.vc, categories: ['music'] },
                 verification: { title: 'Verification', emoji: interaction.client.emoji.verification, categories: ['verification'] },
                 jointocreate: { title: 'Join To Create', emoji: interaction.client.emoji.jtc, categories: ['jointocreate'] },

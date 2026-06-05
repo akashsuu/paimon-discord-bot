@@ -20,6 +20,7 @@ module.exports = {
             { label: 'Utility', description: 'Info, AI tools, translate, avatar and stats', value: 'utility', emoji: client.emoji.utillity },
             { label: 'Server Utility', description: 'Leaderboards and server helpers', value: 'serverutility', emoji: client.emoji.serverutillity },
             { label: 'Fun', description: 'Games, rates, gifs and chaos', value: 'fun', emoji: client.emoji.fun },
+            { label: 'Gif', description: 'Nekos.best anime reactions and gifs', value: 'gif', emoji: client.emoji.fun },
             { label: 'Music', description: 'Lavalink player, queue and voice music', value: 'music', emoji: client.emoji.vc },
             { label: 'Voice & TTS', description: 'Voice moderation, music, TTS and voice tools', value: 'voice', emoji: client.emoji.vc },
             { label: 'Owner Tools', description: 'Owner, premium and developer controls', value: 'owner', emoji: client.emoji.owner || client.emoji.developer || client.emoji.utillity }
