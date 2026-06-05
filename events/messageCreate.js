@@ -26,11 +26,10 @@ const path = require('path')
 const { promisify } = require('util')
 const config = require(`${process.cwd()}/config.json`)
 
-const GROQ_CHAT_URL = 'https://api.groq.com/openai/v1/chat/completions'
-const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile'
 const DEFAULT_LOCAL_URL = 'http://127.0.0.1:1234'
 const execFileAsync = promisify(execFile)
 const voiceChatPlayers = new Map()
+const MESSAGE_CONFIG_CACHE_TTL = 30 * 1000
 
 const cleanText = (value) => String(value || '').replace(/\s+/g, ' ').trim()
 const limitVoiceText = (value) => cleanText(value).slice(0, 240)
@@ -71,6 +70,16 @@ const extractLocalModelIds = (data) => {
 
 const getLocalMemoryKey = (guildId, channelId) => `local_chatbot_memory_${guildId}_${channelId}`
 const getLocalPromptKey = (guildId, channelId) => `local_chatbot_prompt_${guildId}_${channelId}`
+
+const getCachedDbValue = async (client, key, ttl = MESSAGE_CONFIG_CACHE_TTL) => {
+    client.messageConfigCache ??= new Map()
+    const cached = client.messageConfigCache.get(key)
+    if (cached && Date.now() - cached.at < ttl) return cached.value
+
+    const value = await client.db.get(key)
+    client.messageConfigCache.set(key, { value, at: Date.now() })
+    return value
+}
 
 const getLocalMemory = async (client, guildId, channelId) => {
     return (await client.db.get(getLocalMemoryKey(guildId, channelId))) || []
@@ -414,49 +423,11 @@ const askAutoLocalChatbot = async ({ client, baseUrl, model, content, username, 
     }
 }
 
-const askAutoChatbot = async ({ apiKey, model, content, username, guildName }) => {
-    const response = await axios.post(
-        GROQ_CHAT_URL,
-        {
-            model,
-            messages: [
-                {
-                    role: 'system',
-                    content:
-                        `You are akashsuu, a cool savage Discord chatbot in ${guildName}. ` +
-                        'Reply in plain text only. Keep replies short, funny, casual, and helpful. ' +
-                        'Do not use embeds, markdown tables, slurs, threats, harassment, sexual content, or private data. ' +
-                        'If asked for harmful content, refuse with a playful harmless joke.'
-                },
-                {
-                    role: 'user',
-                    content: `${username}: ${content}`
-                }
-            ],
-            temperature: 0.9,
-            max_tokens: 160,
-            top_p: 0.9
-        },
-        {
-            headers: {
-                Authorization: `Bearer ${apiKey}`,
-                'Content-Type': 'application/json'
-            },
-            timeout: 20000
-        }
-    )
-
-    const reply = response.data?.choices?.[0]?.message?.content
-    if (!reply) throw new Error('Groq chatbot returned an invalid response')
-
-    return cleanText(reply).slice(0, 1800)
-}
-
 module.exports = async (client) => {
     client.on('messageCreate', async (message) => {
         if (message.author.bot || !message.guild || message.system) return
         try {          
-            const autodelUsers = (await client.db.get(`autodel_${message.guild.id}`)) || []
+            const autodelUsers = []
             if (autodelUsers.includes(message.author.id)) {
                 if (message.deletable) {
                     await message.delete().catch(() => {})
@@ -464,14 +435,14 @@ module.exports = async (client) => {
                 return
             }
 
-            let uprem = await client.db.get(`uprem_${message.author.id}`)
+            let uprem = null
 
-            let upremend = await client.db.get(`upremend_${message.author.id}`)
+            let upremend = null
             //user premiums scopes ^^
 
-            let sprem = await client.db.get(`sprem_${message.guild.id}`)
+            let sprem = null
 
-            let spremend = await client.db.get(`spremend_${message.guild.id}`)
+            let spremend = null
 
             //server premium scopes ^^
             let scot = 0
@@ -628,13 +599,11 @@ module.exports = async (client) => {
             let prefix = message.guild.prefix || client.config.PREFIX
             const mentionRegexPrefix = RegExp(`^<@!?${client.user.id}>`)
             const prefix1 = message.content.match(mentionRegexPrefix) ? message.content.match(mentionRegexPrefix)[0] : prefix;
+            const isPrefixedMessage = message.content.startsWith(prefix1) || mentionRegexPrefix.test(message.content)
 
-            const voiceChatbotChannelId = await client.db.get(`voice_chatbot_channel_${message.guild.id}`)
-            if (
-                voiceChatbotChannelId === message.channel.id &&
-                !message.content.startsWith(prefix1) &&
-                !message.content.match(mentionRegexPrefix)
-            ) {
+            if (!isPrefixedMessage) {
+                const voiceChatbotChannelId = await getCachedDbValue(client, `voice_chatbot_channel_${message.guild.id}`)
+                if (voiceChatbotChannelId === message.channel.id) {
                 const prompt = cleanText(message.content)
                 if (!prompt) return
 
@@ -727,114 +696,6 @@ module.exports = async (client) => {
                 }
             }
 
-            const localChatbotChannelId = await client.db.get(`local_chatbot_channel_${message.guild.id}`)
-            if (
-                localChatbotChannelId === message.channel.id &&
-                !message.content.startsWith(prefix1) &&
-                !message.content.match(mentionRegexPrefix)
-            ) {
-                const prompt = cleanText(message.content)
-                if (!prompt) return
-
-                client.localChatbotCooldowns ??= new Collection()
-                const cooldownKey = `${message.guild.id}:${message.author.id}`
-                const lastUsed = client.localChatbotCooldowns.get(cooldownKey) || 0
-                if (Date.now() - lastUsed < 3500) return
-                client.localChatbotCooldowns.set(cooldownKey, Date.now())
-
-                const baseUrl = getLocalBaseUrl(client)
-                await message.channel.sendTyping().catch(() => null)
-
-                try {
-                    const model = process.env.LOCAL_CHATBOT_MODEL || process.env.OLLAMA_MODEL || client.config.LOCAL_CHATBOT_MODEL || client.config.OLLAMA_MODEL || await getFirstLocalModel(client, baseUrl)
-                    if (!model) {
-                        return message.reply({
-                            content: 'No local model found. Start your local API and load a model first.',
-                            allowedMentions: { repliedUser: false }
-                        }).catch(() => null)
-                    }
-
-                    const memoryDisabled = await client.db.get(`local_chatbot_memory_disabled_${message.guild.id}_${message.channel.id}`)
-                    const memory = memoryDisabled ? [] : await getLocalMemory(client, message.guild.id, message.channel.id)
-                    const systemPrompt = await getConfiguredLocalPrompt(client, message.guild.id, message.channel.id)
-                    const result = await askAutoLocalChatbot({
-                        client,
-                        baseUrl,
-                        model,
-                        content: prompt.slice(0, 1000),
-                        username: message.author.username,
-                        guildName: message.guild.name,
-                        memory,
-                        systemPrompt
-                    })
-                    await saveOllamaUsage(client, message.guild.id, { ...result, model })
-                    if (!memoryDisabled) {
-                        await saveLocalMemoryTurn(client, message, prompt, result.reply)
-                    }
-
-                    return message.reply({
-                        content: result.reply,
-                        allowedMentions: { repliedUser: false, parse: [] }
-                    })
-                } catch (err) {
-                    client.logger?.log?.(`local auto-chatbot error: ${err.response?.data?.error || err.message}`, 'error')
-                    const unauthorized = err.response?.status === 401
-                    return message.reply({
-                        content: unauthorized
-                            ? 'LM Studio rejected the request with 401 Unauthorized. Set `LOCAL_CHATBOT_API_KEY` in `.env`, or disable API key auth in LM Studio.'
-                            : `Local API is not responding at \`${baseUrl}\`, or the selected model is invalid.`,
-                        allowedMentions: { repliedUser: false }
-                    }).catch(() => null)
-                }
-            }
-
-            const chatbotChannelId = await client.db.get(`chatbot_channel_${message.guild.id}`)
-            if (
-                chatbotChannelId === message.channel.id &&
-                !message.content.startsWith(prefix1) &&
-                !message.content.match(mentionRegexPrefix)
-            ) {
-                const apiKey = process.env.GROQ_API_KEY || client.config.GROQ_API_KEY
-                const model = process.env.GROQ_MODEL || client.config.GROQ_MODEL || DEFAULT_GROQ_MODEL
-                const prompt = cleanText(message.content)
-
-                if (!apiKey) {
-                    return message.reply({
-                        content: 'GROQ_API_KEY missing in .env. Add it and restart me.',
-                        allowedMentions: { repliedUser: false }
-                    }).catch(() => null)
-                }
-
-                if (!prompt) return
-
-                client.chatbotCooldowns ??= new Collection()
-                const cooldownKey = `${message.guild.id}:${message.author.id}`
-                const lastUsed = client.chatbotCooldowns.get(cooldownKey) || 0
-                if (Date.now() - lastUsed < 3500) return
-                client.chatbotCooldowns.set(cooldownKey, Date.now())
-
-                await message.channel.sendTyping().catch(() => null)
-
-                try {
-                    const reply = await askAutoChatbot({
-                        apiKey,
-                        model,
-                        content: prompt.slice(0, 900),
-                        username: message.author.username,
-                        guildName: message.guild.name
-                    })
-
-                    return message.reply({
-                        content: reply,
-                        allowedMentions: { repliedUser: false, parse: [] }
-                    })
-                } catch (err) {
-                    client.logger?.log?.(`chatbot error: ${err.response?.data?.error?.message || err.message}`, 'error')
-                    return message.reply({
-                        content: 'chatbot api is down or the Groq key/model is invalid.',
-                        allowedMentions: { repliedUser: false }
-                    }).catch(() => null)
-                }
             }
 
             let datab = client.noprefix || []
@@ -1115,7 +976,7 @@ module.exports = async (client) => {
                 }
             }*/
             if (!command) return
-            let maintain = await client.db.get(`maintanance_${client.user.id}`)
+            let maintain = await getCachedDbValue(client, `maintanance_${client.user.id}`)
             if (maintain && !client.config.admin.includes(message.author.id)) {
                 const row = new ActionRowBuilder().addComponents(
                     new ButtonBuilder()
@@ -1131,9 +992,7 @@ module.exports = async (client) => {
                 )
                 return message.channel.send({ embeds: [client.util.embed().setColor(client.color).setTitle("Notice: Bot Functionality Globally Disabled by Developers").setDescription(`Dear Discord Community Members,\n\nWe regret to inform you that the functionality of the bot has been globally disabled by the developers. We understand the inconvenience this may cause and appreciate your understanding as we work to resolve the issue.\n\nThank you for your patience and continued support.\nSincerely,\n[𝑻𝒆𝒓𝒎𝒊𝒏𝒂𝒕𝒐𝒓 </>](${client.config.invite})`)], components: [row] })
             }
-            const ignore = (await client.db?.get(
-                `ignore_${message.guild.id}`
-            )) ?? { channel: [], role: [] }
+            const ignore = (await getCachedDbValue(client, `ignore_${message.guild.id}`)) ?? { channel: [], role: [] }
             if (!client.config.owner.includes(message.author.id) &&
                 ignore.channel.includes(message.channel.id) &&
                 !message.member.roles.cache.some((role) =>

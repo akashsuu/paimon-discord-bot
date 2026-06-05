@@ -1,0 +1,10 @@
+Use these 3 commands to push changes:
+
+git add .
+git commit -m "update bot"
+git push
+
+If GitHub says non-fast-forward, your local repo and GitHub main have different history.
+Use this only when you want this local folder to overwrite GitHub main:
+
+git push --force-with-lease origin main

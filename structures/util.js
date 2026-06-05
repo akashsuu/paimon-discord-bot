@@ -971,22 +971,35 @@ module.exports = class Util {
     }
 
     async setPrefix(message, client) {
-        let prefix = await this.client.db.get(`prefix_${message?.guild?.id}`) || client.config.PREFIX
+        const key = `prefix_${message?.guild?.id}`
+        const cached = this.client.prefixCache?.get(key)
+        let prefix = cached && Date.now() - cached.at < 30000
+            ? cached.value
+            : await this.client.db.get(key)
+        prefix ||= client.config.PREFIX
         if (prefix === null) prefix = client.config.PREFIX
-            message.guild.prefix = prefix
+        this.client.prefixCache ??= new Map()
+        this.client.prefixCache.set(key, { value: prefix, at: Date.now() })
+        message.guild.prefix = prefix
     }
     async noprefix() {
-        let data = (await this.client.db.get(`noprefix_${this.client.user.id}`))
-            ? await this.client.db.get(`noprefix_${this.client.user.id}`)
-            : []
+        const key = `noprefix_${this.client.user.id}`
+        const cached = this.client.noprefixCache
+        let data = cached && Date.now() - cached.at < 30000
+            ? cached.value
+            : await this.client.db.get(key)
+        data ||= []
+        this.client.noprefixCache = { value: data, at: Date.now() }
         this.client.noprefix = data
     }
     async blacklist() {
-        let data = (await this.client.db.get(
-            `blacklist_${this.client.user.id}`
-        ))
-            ? await this.client.db.get(`blacklist_${this.client.user.id}`)
-            : []
+        const key = `blacklist_${this.client.user.id}`
+        const cached = this.client.blacklistCache
+        let data = cached && Date.now() - cached.at < 30000
+            ? cached.value
+            : await this.client.db.get(key)
+        data ||= []
+        this.client.blacklistCache = { value: data, at: Date.now() }
         this.client.blacklist = data
     }
 
