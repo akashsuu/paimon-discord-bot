@@ -190,13 +190,34 @@ const parseGroqQueries = (text) => {
         .filter(Boolean)
 }
 
-const groqRecommendationQueries = async (client, seedTrack, recentTitles) => {
+const resolveSpotifySeedTrack = async (player, seedTrack, requester) => {
+    const info = seedTrack?.info || {}
+    const title = String(info.title || '').replace(/\(.*?\)|\[.*?\]|official|video|audio|lyrics|remix|cover|edit/gi, '').trim()
+    const author = String(info.author || '').trim()
+    const query = `${author} ${title}`.replace(/\s+/g, ' ').trim()
+    if (!query) return seedTrack
+
+    const result = await player.search({ query, source: 'spsearch' }, requester).catch(() => null)
+    const spotifyTrack = result?.tracks?.find((track) => {
+        const spotifyTitle = track?.info?.title
+        if (!spotifyTitle) return false
+        return isSameSongTitle(seedTrack?.info?.title, spotifyTitle) ||
+            tokenOverlap(titleTokens(seedTrack?.info?.title), titleTokens(spotifyTitle)) >= 0.35
+    })
+
+    return spotifyTrack || result?.tracks?.[0] || seedTrack
+}
+
+const groqRecommendationQueries = async (client, seedTrack, recentTitles, spotifySeedTrack = null) => {
     const apiKey = process.env.GROQ_API_KEY || client.config.GROQ_API_KEY
     const model = process.env.MUSIC_GROQ_MODEL || client.config.MUSIC_GROQ_MODEL || process.env.GROQ_MODEL || client.config.GROQ_MODEL
     if (!apiKey || !model || !seedTrack?.info?.title) return []
 
-    const seedTitle = seedTrack.info.title || 'Unknown song'
-    const seedAuthor = seedTrack.info.author || 'Unknown artist'
+    const seedInfo = spotifySeedTrack?.info || seedTrack.info
+    const seedTitle = seedInfo.title || seedTrack.info.title || 'Unknown song'
+    const seedAuthor = seedInfo.author || seedTrack.info.author || 'Unknown artist'
+    const originalTitle = seedTrack.info.title || 'Unknown song'
+    const originalAuthor = seedTrack.info.author || 'Unknown artist'
     const response = await axios.post(
         GROQ_URL,
         {
@@ -214,7 +235,9 @@ const groqRecommendationQueries = async (client, seedTrack, recentTitles) => {
                 {
                     role: 'user',
                     content:
-                        `Previous song: ${seedAuthor} - ${seedTitle}\n` +
+                        `Spotify matched previous song: ${seedAuthor} - ${seedTitle}\n` +
+                        `Original played song metadata: ${originalAuthor} - ${originalTitle}\n` +
+                        'Recommend songs that would appear in Spotify radio after this exact track.\n' +
                         `Recently used titles to avoid: ${recentTitles.join(', ') || 'none'}`
                 }
             ],
@@ -242,6 +265,7 @@ const searchRelatedTrack = async (client, player, seedTrack) => {
     const skippedTitles = player.getData?.('skippedAutoplayTitles') || []
     const recentTitles = recentAutoplayTitles(player)
     const requester = seedTrack?.requester || player.getData?.('autoplayRequester')
+    const spotifySeedTrack = await resolveSpotifySeedTrack(player, seedTrack, requester)
     const sources = [
         'spsearch',
         process.env.LAVALINK_SEARCH || 'ytmsearch',
@@ -252,6 +276,7 @@ const searchRelatedTrack = async (client, player, seedTrack) => {
         const title = candidate?.info?.title
         if (!title || candidate?.info?.uri === seedUri || skippedUris.has(candidate?.info?.uri)) return false
         if (isSameSongTitle(seedTrack?.info?.title, title)) return false
+        if (spotifySeedTrack && isSameSongTitle(spotifySeedTrack?.info?.title, title)) return false
         if (sameArtist(seedTrack?.info?.author, candidate?.info?.author) && tokenOverlap(titleTokens(seedTrack?.info?.title), titleTokens(title)) >= 0.2) return false
         if (skippedTitles.some((skippedTitle) => isSameSongTitle(skippedTitle, title))) return false
         if (recentTitles.some((recentTitle) => isSameSongTitle(recentTitle, title))) return false
@@ -270,13 +295,13 @@ const searchRelatedTrack = async (client, player, seedTrack) => {
         }
         return candidates
     }
-    const groqQueries = await groqRecommendationQueries(client, seedTrack, recentTitles).catch((err) => {
+    const groqQueries = await groqRecommendationQueries(client, seedTrack, recentTitles, spotifySeedTrack).catch((err) => {
         client.logger?.log?.(`music groq recommendation skipped: ${err.response?.data?.error?.message || err.message}`, 'warn')
         return []
     })
 
     if (groqQueries.length) {
-        client.logger?.log?.(`music groq recommendations: ${groqQueries.join(' | ')}`, 'log')
+        client.logger?.log?.(`music groq recommendations from ${spotifySeedTrack?.info?.author || seedTrack?.info?.author} - ${spotifySeedTrack?.info?.title || seedTrack?.info?.title}: ${groqQueries.join(' | ')}`, 'log')
         const groqCandidates = await collectCandidates(groqQueries)
         if (groqCandidates.length) return shuffleArray(groqCandidates)[0]
     }
