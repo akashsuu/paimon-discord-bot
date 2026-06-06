@@ -1,8 +1,10 @@
+const axios = require('axios')
 const { LavalinkManager } = require('lavalink-client')
 const { COMPONENTS_V2_FLAG, formatDuration, musicControls, musicPlayerComponents, trackName } = require('../structures/musicUtil')
 
 const truthy = (value) => ['1', 'true', 'yes', 'on'].includes(String(value || '').toLowerCase())
 const AUTO_LEAVE_MS = 60 * 1000
+const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
 const DEFAULT_PUBLIC_NODE = {
     id: 'nexcloud',
     host: 'n3.nexcloud.in',
@@ -40,8 +42,10 @@ const resolveNode = (client) => {
     }
 }
 
-const isAutoplayEnabled = () => {
-    return !['0', 'false', 'off', 'no'].includes(String(process.env.MUSIC_AUTOPLAY || 'true').toLowerCase())
+const isAutoplayEnabled = (player) => {
+    const playerValue = player?.getData?.('autoplayEnabled')
+    if (typeof playerValue !== 'undefined') return Boolean(playerValue)
+    return ['1', 'true', 'yes', 'on'].includes(String(process.env.MUSIC_AUTOPLAY || 'false').toLowerCase())
 }
 
 const clearLeaveTimer = (player) => {
@@ -170,7 +174,65 @@ const relatedQueries = (track) => {
     ].map((query) => query.replace(/\s+/g, ' ').trim()).filter(Boolean)
 }
 
-const searchRelatedTrack = async (player, seedTrack) => {
+const parseGroqQueries = (text) => {
+    const raw = String(text || '').trim()
+    if (!raw) return []
+
+    try {
+        const parsed = JSON.parse(raw.replace(/^```(?:json)?|```$/g, '').trim())
+        if (Array.isArray(parsed)) return parsed
+        if (Array.isArray(parsed.queries)) return parsed.queries
+    } catch (err) {}
+
+    return raw
+        .split(/\r?\n|,/)
+        .map((line) => line.replace(/^[-*\d.\s"']+|["']+$/g, '').trim())
+        .filter(Boolean)
+}
+
+const groqRecommendationQueries = async (client, seedTrack, recentTitles) => {
+    const apiKey = process.env.GROQ_API_KEY || client.config.GROQ_API_KEY
+    const model = process.env.GROQ_MODEL || client.config.GROQ_MODEL
+    if (!apiKey || !model || !seedTrack?.info?.title) return []
+
+    const response = await axios.post(
+        GROQ_URL,
+        {
+            model,
+            messages: [
+                {
+                    role: 'system',
+                    content:
+                        'You recommend music search queries for a Discord music bot. ' +
+                        'Return only a JSON array of 6 strings. Each string must be "Artist - Song". ' +
+                        'Pick different songs with a similar vibe. Do not include the same song, remixes, covers, sped up, slowed, live, karaoke, or reuploads.'
+                },
+                {
+                    role: 'user',
+                    content:
+                        `Previous song: ${seedTrack.info.author || 'Unknown artist'} - ${seedTrack.info.title}\n` +
+                        `Recently used titles to avoid: ${recentTitles.join(', ') || 'none'}`
+                }
+            ],
+            temperature: 0.85,
+            max_tokens: 220
+        },
+        {
+            headers: {
+                Authorization: `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
+            },
+            timeout: 12000
+        }
+    )
+
+    return parseGroqQueries(response.data?.choices?.[0]?.message?.content)
+        .map((query) => query.replace(/\s+/g, ' ').trim())
+        .filter(Boolean)
+        .slice(0, 6)
+}
+
+const searchRelatedTrack = async (client, player, seedTrack) => {
     const seedUri = seedTrack?.info?.uri
     const skippedUris = new Set(player.getData?.('skippedAutoplayUris') || [])
     const skippedTitles = player.getData?.('skippedAutoplayTitles') || []
@@ -183,8 +245,13 @@ const searchRelatedTrack = async (player, seedTrack) => {
         'scsearch'
     ].filter((source, index, array) => source && array.indexOf(source) === index)
     const candidates = []
+    const groqQueries = await groqRecommendationQueries(client, seedTrack, recentTitles).catch((err) => {
+        client.logger?.log?.(`music groq recommendation skipped: ${err.response?.data?.error?.message || err.message}`, 'warn')
+        return []
+    })
+    const queries = [...groqQueries, ...relatedQueries(seedTrack)]
 
-    for (const query of shuffleArray(relatedQueries(seedTrack))) {
+    for (const query of shuffleArray(queries)) {
         for (const source of shuffleArray(sources)) {
             const result = await player.search({ query, source }, requester).catch(() => null)
             for (const candidate of shuffleArray(result?.tracks || []).slice(0, 10)) {
@@ -359,6 +426,33 @@ module.exports = async (client) => {
                 })
             }
 
+            if (action === 'music_autoplay') {
+                const nextState = !isAutoplayEnabled(player)
+                player.setData?.('autoplayEnabled', nextState)
+                if (interaction.user) player.setData?.('autoplayRequester', interaction.user)
+
+                const current = player.queue.current
+                if (current && interaction.message?.flags?.has?.(COMPONENTS_V2_FLAG)) {
+                    return interaction.update({
+                        flags: COMPONENTS_V2_FLAG,
+                        components: musicPlayerComponents({
+                            track: current,
+                            player,
+                            voiceChannelId: player.voiceChannelId,
+                            requester: current.requester || interaction.user
+                        })
+                    }).then(() => interaction.followUp({
+                        content: `Autoplay ${nextState ? 'enabled' : 'disabled'}.`,
+                        ephemeral: true
+                    })).catch(() => null)
+                }
+
+                return interaction.reply({
+                    content: `Autoplay ${nextState ? 'enabled' : 'disabled'}.`,
+                    ephemeral: true
+                })
+            }
+
             if (action === 'music_previous') {
                 const previous = await player.queue.shiftPrevious().catch(() => null)
                 if (!previous) {
@@ -370,9 +464,9 @@ module.exports = async (client) => {
 
             if (action === 'music_skip') {
                 const current = player.queue.current
-                if (!player.queue?.tracks?.length && isAutoplayEnabled() && current) {
+                if (!player.queue?.tracks?.length && isAutoplayEnabled(player) && current) {
                     rememberSkippedTrack(player, current)
-                    const nextTrack = await searchRelatedTrack(player, current)
+                    const nextTrack = await searchRelatedTrack(client, player, current)
                     if (nextTrack) {
                         player.queue.add(nextTrack)
                         await player.skip()
@@ -419,7 +513,7 @@ module.exports = async (client) => {
 
             if (action === 'music_settings') {
                 return interaction.reply({
-                    content: `Volume: ${player.volume}% | Queue: ${player.queue.tracks.length} waiting | Status: ${player.paused ? 'paused' : 'playing'}`,
+                    content: `Volume: ${player.volume}% | Queue: ${player.queue.tracks.length} waiting | Status: ${player.paused ? 'paused' : 'playing'} | Autoplay: ${isAutoplayEnabled(player) ? 'on' : 'off'}`,
                     ephemeral: true
                 })
             }
@@ -478,9 +572,9 @@ module.exports = async (client) => {
     client.lavalink.on('queueEnd', async (player) => {
         const seedTrack = player.getData?.('autoplaySeedTrack') || player.queue?.current
 
-        if (isAutoplayEnabled() && seedTrack) {
+        if (isAutoplayEnabled(player) && seedTrack) {
             try {
-                const nextTrack = await searchRelatedTrack(player, seedTrack)
+                const nextTrack = await searchRelatedTrack(client, player, seedTrack)
                 if (nextTrack) {
                     nextTrack.pluginInfo = {
                         ...(nextTrack.pluginInfo || {}),

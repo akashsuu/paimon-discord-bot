@@ -165,11 +165,16 @@ const musicControls = (disabled = false) => [
     ),
     new ActionRowBuilder().addComponents(
         new ButtonBuilder()
+            .setCustomId('music_autoplay')
+            .setLabel('Autoplay')
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(disabled),
+        new ButtonBuilder()
             .setCustomId('music_stop')
             .setLabel('Stop Player')
             .setStyle(ButtonStyle.Danger)
             .setDisabled(disabled)
-    )
+    ),
 ]
 
 const musicButton = (customId, label, style = 2, disabled = false) => ({
@@ -188,6 +193,7 @@ const musicPlayerComponents = ({ track, player, voiceChannelId, requester, disab
     const queueSize = player?.queue?.tracks?.length || 0
     const volume = player?.volume || 80
     const thumbnail = info.artworkUrl
+    const autoplayEnabled = Boolean(player?.getData?.('autoplayEnabled'))
     const requesterText = requester ? `\n-# Requested by ${requester}` : ''
     const playlistText = playlistSize ? `\nQueued **${playlistSize}** tracks.` : ''
 
@@ -230,6 +236,7 @@ const musicPlayerComponents = ({ track, player, voiceChannelId, requester, disab
                 musicButton('music_voldown', 'Vol -', 2, disabled),
                 musicButton('music_volup', 'Vol +', 2, disabled),
                 musicButton('music_settings', 'Settings', 2, disabled),
+                musicButton('music_autoplay', autoplayEnabled ? 'Autoplay On' : 'Autoplay Off', autoplayEnabled ? 3 : 2, disabled),
                 musicButton('music_stop', 'Stop', 4, disabled)
             ]
         }

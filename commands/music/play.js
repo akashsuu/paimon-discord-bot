@@ -25,7 +25,9 @@ module.exports = {
         try {
             const player = await getOrCreatePlayer(client, message, voiceChannel)
             if (!player) return
-            player.setData?.('autoplayEnabled', true)
+            if (typeof player.getData?.('autoplayEnabled') === 'undefined') {
+                player.setData?.('autoplayEnabled', false)
+            }
             player.setData?.('autoplayRequester', message.author)
             const shouldStartPlayer = !player.playing && !player.paused
 
