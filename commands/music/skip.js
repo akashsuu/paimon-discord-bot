@@ -12,9 +12,11 @@ module.exports = {
         const current = player.queue.current
         if (!current && !player.playing) return fail(client, message, 'Nothing is playing right now.')
 
-        await player.skip().catch((err) => {
-            throw err
-        })
+        if (player.queue?.tracks?.length) {
+            await player.skip()
+        } else {
+            await player.stopPlaying(false, false)
+        }
 
         return ok(client, message, `Skipped ${current ? trackName(current) : 'the current track'}.`)
     }
