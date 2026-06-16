@@ -69,7 +69,7 @@ const generateRoast = async ({ apiKey, target, profileSummary, context, authorNa
     const response = await axios.post(
         NVIDIA_URL,
         {
-            model: 'microsoft/phi-3-vision-128k-instruct',
+            model: 'moonshotai/kimi-k2.5',
             messages: [
                 {
                     role: 'system',
@@ -180,12 +180,13 @@ module.exports = {
 
             return msg.edit({ embeds: [embed], content: null })
         } catch (err) {
-            client.logger?.log?.(`roast nvidia error: ${err.response?.data?.error?.message || err.message}`, 'error')
+            const errMsg = err.response?.data?.error?.message || err.message
+            client.logger?.log?.(`roast nvidia error: ${errMsg}`, 'error')
             return msg.edit({
                 embeds: [
                     client.util.embed()
                         .setColor(client.color)
-                        .setDescription(`${client.emoji.cross} | NVIDIA roast AI is **currently down** or the API key/model is invalid.`)
+                        .setDescription(`${client.emoji.cross} | NVIDIA roast error: \`${errMsg}\``)
                 ]
             })
         }
