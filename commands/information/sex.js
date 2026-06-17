@@ -10,16 +10,22 @@ module.exports = {
         const msg = await message.channel.send('Fetching...');
 
         try {
-            const { data } = await axios.get('https://api.waifu.pics/sfw/hug');
-            const url = data?.url;
+            const { data } = await axios.get('https://api.nekosapi.com/v4/images/random', {
+                params: {
+                    rating: 'safe',
+                    limit: 1,
+                },
+            });
 
-            if (!url) {
+            const image = data?.[0];
+            if (!image) {
                 return msg.edit('No images found.');
             }
 
             const embed = client.util.embed()
                 .setColor(client.color)
-                .setImage(url);
+                .setImage(image.url)
+                .setFooter({ text: `Image ${image.id}` });
 
             return msg.edit({ content: null, embeds: [embed] });
         } catch (err) {
