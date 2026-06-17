@@ -1,0 +1,213 @@
+═══════════════════════════════════════════════════════════════
+  Waifu.im API — Everything You Can Make
+  Base URL: https://api.waifu.im
+═══════════════════════════════════════════════════════════════
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. IMAGE SEARCH & BROWSING  (GET /images)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  → Get random SFW/NSFW waifu images
+  → Filter by tags (waifu, maid, uniform, ero, ecchi, oppai, etc.)
+  → Include tags (AND logic — all must match)
+  → Exclude tags (OR logic — any match excluded)
+  → Filter by artists (by artist ID)
+  → Filter by specific image IDs
+  → Filter by NSFW level: SFW only, NSFW only, or All
+  → Filter by animated/GIF images only
+  → Filter by orientation: portrait, landscape
+  → Filter by exact width, height, or file size
+  → Filter by width/height/size range (e.g., >=1920, <=2000000, 1280..1920)
+  → Sort by random, upload date, popularity
+  → Paginate results (page number, page size)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2. SINGLE IMAGE LOOKUP  (GET /images/{id})
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  → Get full details of a specific image
+  → See tags, artists, source URL, dimensions, file size
+  → Check if you've favorited it (when authenticated)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+3. TAGS  (GET /tags)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Available tags (20 total):
+    waifu (4269 images)
+    ero (3006)
+    ecchi (2129)
+    oppai (1077)
+    hentai (883)
+    milf (466)
+    uniform (445)
+    ass (412)
+    maid (272)
+    selfies (181)
+    oral (146)
+    paizuri (146)
+    genshin-impact (84)
+    raiden-shogun (69)
+    marin-kitagawa (43)
+    mori-calliope (26)
+    kamisato-ayaka (14)
+    rem (10)
+    arknights (0)
+    black-clover (0)
+
+  → List all available tags
+  → Get tag details (name, description, image count)
+  → Create new tags
+  → Update tag info
+  → Delete tags
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+4. ARTISTS  (GET /artists)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  → List all artists
+  → Search artists by name (partial match)
+  → Get artist details by ID
+  → Get artist by exact name
+  → Create new artist entries
+  → Update artist info (name, social links)
+  → Delete artists
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+5. AUTHENTICATION (Requires Discord OAuth)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  POST /auth/discord → Login with Discord, get JWT token
+  GET  /auth/api-keys → List your API keys
+  POST /auth/api-keys → Create a new API key
+  PATCH /auth/api-keys/{id} → Update API key description/expiry
+  DELETE /auth/api-keys/{id} → Revoke an API key
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+6. ALBUMS & FAVORITES (Requires Auth)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  → List all albums for a user
+  → Create custom albums (name + description)
+  → Get album details
+  → Update album name/description
+  → Delete albums
+  → List all images in an album (with full filtering)
+  → Add images to an album / favorites
+  → Remove images from an album
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+7. USER MANAGEMENT (Requires Auth)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  → Get user profile (use "me" as alias)
+  → List user's albums
+  → List user's favorites
+  → Update user profile
+  → Delete account
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+8. STATISTICS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  → Get popular tags (most used)
+  → Get API usage statistics
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+9. IMAGE UPLOAD & MANAGEMENT (Requires Auth/Mod)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  → Upload new images (max 10MB)
+  → Update image metadata (tags, artists, source URL, NSFW flag)
+  → Replace image file
+  → Delete images
+  → Moderate/review pending uploads
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+10. REPORTS (Requires Auth/Mod)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  → Report inappropriate images
+  → List reports (mod only)
+  → Resolve/dismiss reports
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+11. THINGS YOU CAN BUILD WITH THIS API
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  a) Discord Bot
+     - /waifu command — send random waifu images
+     - Filter by tag: .waifu maid, .waifu uniform
+     - NSFW toggle for NSFW channels
+     - Favorite system — save images to your account
+     - Daily waifu feed
+
+  b) Website / Gallery
+     - Image gallery with tag filtering
+     - Pinterest-style mood board
+     - Personal waifu collection manager
+     - Character-specific galleries (Genshin, Rem, etc.)
+
+  c) Mobile App
+     - Waifu wallpaper app (filter by resolution/orientation)
+     - Daily waifu widget
+     - Random waifu generator
+
+  d) Automation / Scripts
+     - Download images by tag
+     - Set random desktop wallpaper from specific tags
+     - Auto-post to social media
+     - Build a local dataset by tag
+
+  e) API Mashups
+     - Combined Discord bot with economy + waifu collection
+     - Voting/polling bot with waifu images
+     - Anime-themed chatbot with image responses
+
+  f) Moderation Tools
+     - Upload queue manager
+     - Tag/artist review dashboard
+     - Report management interface
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+QUICK START EXAMPLES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  # Random SFW image
+  curl https://api.waifu.im/images
+
+  # Filter by tag
+  curl "https://api.waifu.im/images?IncludedTags=maid"
+
+  # NSFW images only
+  curl "https://api.waifu.im/images?IsNsfw=True"
+
+  # Multiple tags (AND)
+  curl "https://api.waifu.im/images?IncludedTags=waifu&IncludedTags=uniform"
+
+  # Exclude tags
+  curl "https://api.waifu.im/images?ExcludedTags=hentai"
+
+  # Portrait orientation, animated
+  curl "https://api.waifu.im/images?Orientation=portrait&IsAnimated=True"
+
+  # Pagination
+  curl "https://api.waifu.im/images?PageSize=5&Page=2"
+
+  # Filter by resolution (min 1920x1080)
+  curl "https://api.waifu.im/images?Width=%3E=1920&Height=%3E=1080"
+
+  # List all tags
+  curl https://api.waifu.im/tags
+
+  # Get image by ID
+  curl https://api.waifu.im/images/8008
+
+  # Authenticated: List your favorites (use X-Api-Key header)
+  curl -H "X-Api-Key: YOUR_KEY" https://api.waifu.im/users/me/albums/favorites/images
+
+  # Add to favorites
+  curl -X POST -H "X-Api-Key: YOUR_KEY" \
+    https://api.waifu.im/users/me/albums/favorites/images/8008
+
+═══════════════════════════════════════════════════════════════

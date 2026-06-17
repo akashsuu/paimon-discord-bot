@@ -1,0 +1,201 @@
+═══════════════════════════════════════════════════════════════
+  Nekos API v4 — Everything You Can Make
+  Base URL: https://api.nekosapi.com/v4
+═══════════════════════════════════════════════════════════════
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. IMAGE SEARCH & BROWSING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  GET /v4/images
+  → Search images with filters (limit, offset, tags, rating, artist)
+  → Filter by tags (comma-delimited: ?tags=girl,maid)
+  → Exclude tags (?without_tags=hentai)
+  → Filter by rating: safe, suggestive, borderline, explicit
+  → Filter by artist ID
+  → Paginate with limit (max 100) and offset
+  → 40,000+ images total
+
+  GET /v4/images/random
+  → Get random images (supports same filters as above)
+  → Limit param: 1-100 images per request
+
+  GET /v4/images/random/file
+  → Redirect to a random image file URL
+  → Supports rating, tags, without_tags, artist filters
+  → Returns raw file (not JSON)
+
+  GET /v4/images/{id}
+  → Get a specific image by ID
+  → Returns full metadata (tags, colors, artist, source URL, etc.)
+
+  GET /v4/images/{id}/tags
+  → Get tags for a specific image
+
+  GET /v4/images/{id}/artist
+  → Get artist info for a specific image
+
+  GET /v4/images/{id}/characters
+  → Get characters for a specific image
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2. IMAGE REPORTING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  POST /v4/images/{id}/report
+  → Report an inappropriate image
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+3. FILTERING BY RELATED ENTITIES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  GET /v4/images/tags/{id}/images
+  → Get all images with a specific tag by tag ID
+
+  GET /v4/artists/{id}/images
+  → Get all images by a specific artist
+
+  GET /v4/characters/{id}/images
+  → Get all images of a specific character
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+4. TAGS (52 available)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Available tag names (AI-tagged):
+  Illustration, Girl, Black hair, Sportswear, Sword,
+  Kemonomimi, Flowers, Catgirl, White hair, Loli,
+  Plants, Blue Hair, Pink hair, Purple hair,
+  Exposed girl breasts, Exposed anus, Pussy, Dick,
+  Maid, Beach, Reading, Mountain, Night, Gloves,
+  Original Style, Brown Hair, Sunny, Rain, Shorts,
+  Weapon, Bikini, Ice Cream, Tree, Bunny girl, Dress,
+  Usagimimi, School Uniform, Guitar, Baggy Clothes, Wet,
+  Yuri, Red hair, Glasses, Anal, Futanari, Masturbating,
+  Threesome, Kissing, Skirt, Blonde hair, Horsegirl, Boy
+
+  Usage: ?tags=maid,girl or ?tags=sword,kemonomimi
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+5. RATINGS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  safe          → SFW, non-sexual
+  suggestive    → Mildly suggestive/risque
+  borderline    → Near-explicit
+  explicit      → Explicit/NSFW content
+
+  Usage: ?rating=safe or ?rating=safe,suggestive
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+6. IMAGE RESPONSE DATA (per image)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  {
+    id              → Image ID
+    url             → Image file URL (.webp)
+    rating          → safe/suggestive/borderline/explicit
+    tags            → Array of tag strings
+    artist_name     → Artist name (or null)
+    source_url      → Source link (Danbooru, Pixiv, etc.)
+    color_dominant  → [R, G, B] dominant color
+    color_palette   → [[R,G,B], ...] 9-color palette
+  }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+7. KEY FEATURES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ✓ Completely free — no API key required
+  ✓ No rate limits (currently)
+  ✓ Open source (MIT license)
+  ✓ 40,000+ anime images and GIFs
+  ✓ AI-tagged with 52+ tags
+  ✓ ~300ms average response time
+  ✓ Pagination with limit + offset
+  ✓ Images in .webp format
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+8. THINGS YOU CAN BUILD
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  a) Discord Bot Commands
+     !neko          → Random image
+     !neko maid     → Random maid image
+     !neko safe     → SFW only
+     !nekogif       → Random anime GIF
+     !waifu         → Random girl image
+
+  b) Website / Gallery
+     - Anime image gallery with tag filters
+     - Daily anime wallpaper site
+     - Character-specific gallery pages
+     - Color palette explorer (uses color_dominant)
+     - "Waifu of the day" widget
+
+  c) Mobile App
+     - Anime wallpaper app (filter by tags)
+     - Daily notification with random image
+     - Waifu collection tracker
+
+  d) AI / Data Projects
+     - Build a dataset of tagged anime images
+     - Train models using the color palette data
+     - Anime style classifier
+
+  e) Social Media Bots
+     - Twitter/IG bot that posts tagged images
+     - Reddit bot for anime subreddits
+     - Telegram sticker/image bot
+
+  f) API Mashups
+     - Bot that sends matching anime reaction images
+     - Mood-based image recommender (by dominant color)
+     - Combined Discord bot with economy + waifu collection
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+QUICK START EXAMPLES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  # Random image (default 1)
+  curl https://api.nekosapi.com/v4/images/random
+
+  # 5 random images
+  curl "https://api.nekosapi.com/v4/images/random?limit=5"
+
+  # Filter by tag: maid
+  curl "https://api.nekosapi.com/v4/images/random?tags=maid"
+
+  # Multiple tags (AND logic)
+  curl "https://api.nekosapi.com/v4/images/random?tags=maid,girl"
+
+  # Exclude tags
+  curl "https://api.nekosapi.com/v4/images/random?without_tags=explicit"
+
+  # Rating filter (safe only)
+  curl "https://api.nekosapi.com/v4/images/random?rating=safe"
+
+  # Search with all filters
+  curl "https://api.nekosapi.com/v4/images?tags=girl,sword&rating=safe&limit=5"
+
+  # Paginate
+  curl "https://api.nekosapi.com/v4/images?limit=10&offset=20"
+
+  # Get image by ID
+  curl https://api.nekosapi.com/v4/images/4381
+
+  # Get random file redirect (returns image binary)
+  curl -L "https://api.nekosapi.com/v4/images/random/file?tags=catgirl"
+
+  # Query by tag IDs using nested endpoint
+  curl https://api.nekosapi.com/v4/images/tags/1/images
+
+  # Filter by multiple ratings
+  curl "https://api.nekosapi.com/v4/images/random?rating=safe,suggestive"
+
+  # JavaScript fetch example
+  fetch("https://api.nekosapi.com/v4/images/random?tags=maid&rating=safe")
+    .then(r => r.json())
+    .then(data => console.log(data[0].url))
+
+═══════════════════════════════════════════════════════════════
