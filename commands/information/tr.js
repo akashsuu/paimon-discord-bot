@@ -1,5 +1,6 @@
 const axios = require('axios')
 const { AttachmentBuilder, ComponentType } = require('discord.js')
+const decodeCmd = require('./decode.js')
 
 const COMPONENTS_V2_FLAG = 1 << 15
 const GROQ_TTS_URL = 'https://api.groq.com/openai/v1/audio/speech'
@@ -152,6 +153,10 @@ module.exports = {
     category: 'utility',
     premium: true,
     run: async (client, message, args) => {
+        if (args[0]?.toLowerCase() === 'decode') {
+            return decodeCmd.run(client, message, args.slice(1))
+        }
+
         let text = stripMentions(args.join(' '))
 
         if (!text && message.reference?.messageId) {

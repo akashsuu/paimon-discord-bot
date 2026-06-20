@@ -10,24 +10,32 @@ module.exports = {
         const msg = await message.channel.send('Fetching Miku...');
 
         try {
-            const { data } = await axios.get('https://api.nekosapi.com/v4/images/random', {
+            const { data } = await axios.get('https://danbooru.donmai.us/posts.json', {
                 params: {
-                    character: 'miku',
-                    rating: 'safe',
-                    limit: 1,
+                    tags: 'hatsune_miku rating:s',
+                    limit: 100,
+                },
+                headers: {
+                    'User-Agent': 'akashsuuBot/1.0',
                 },
             });
 
-            const image = data?.[0];
-            if (!image) {
+            if (!data?.length) {
+                return msg.edit('No Miku images found.');
+            }
+
+            const post = data[Math.floor(Math.random() * data.length)];
+            const url = post.file_url || post.large_file_url;
+            if (!url) {
                 return msg.edit('No Miku images found.');
             }
 
             const embed = client.util.embed()
                 .setColor('#33CCFF')
                 .setTitle('Hatsune Miku')
-                .setURL(image.url)
-                .setImage(image.url);
+                .setURL(`https://danbooru.donmai.us/posts/${post.id}`)
+                .setImage(url)
+                .setFooter({ text: `Rating: ${post.rating}  ·  ${post.image_width}x${post.image_height}` });
 
             return msg.edit({ content: null, embeds: [embed] });
         } catch (err) {
