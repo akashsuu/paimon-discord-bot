@@ -81,32 +81,10 @@ const waitForVoiceReady = async (player, timeout = 7000) => {
     throw new Error('Voice connection was not ready. Rejoin voice and try again.')
 }
 
-const FALLBACK_PUBLIC_NODE = {
-    id: 'nexcloud',
-    host: 'n3.nexcloud.in',
-    port: 2026,
-    authorization: 'nexcloud',
-    secure: false,
-    requestSignalTimeoutMS: 30000,
-    retryAmount: 5,
-    retryDelay: 10000
-}
-
 const connectedNodeCount = (lavalink) => {
     const nodes = lavalink?.nodeManager?.nodes
     if (!nodes) return 0
     return Array.from(nodes.values()).filter((node) => node.connected).length
-}
-
-const connectNode = async (node, client) => {
-    try {
-        const promise = node.connect()
-        if (promise && typeof promise.then === 'function') {
-            await promise
-        }
-    } catch (err) {
-        client.logger?.log?.(`Lavalink reconnect failed (${node.id}): ${err.message}`, 'warn')
-    }
 }
 
 const ensureAvailableNode = async (client) => {
@@ -122,19 +100,14 @@ const ensureAvailableNode = async (client) => {
     const nodes = Array.from(nodeManager.nodes.values())
     for (const node of nodes) {
         if (node.connected) continue
-        await connectNode(node, client)
-    }
-
-    if (connectedNodeCount(lavalink) > 0) return true
-
-    for (const node of nodes) {
-        nodeManager.destroyNode(node.id)
-    }
-    nodeManager.createNode(FALLBACK_PUBLIC_NODE)
-    const fallbackNodes = Array.from(nodeManager.nodes.values())
-    for (const node of fallbackNodes) {
-        if (node.connected) continue
-        await connectNode(node, client)
+        try {
+            const promise = node.connect()
+            if (promise && typeof promise.then === 'function') {
+                await promise
+            }
+        } catch (err) {
+            client.logger?.log?.(`Lavalink reconnect failed (${node.id}): ${err.message}`, 'warn')
+        }
     }
 
     return connectedNodeCount(lavalink) > 0
