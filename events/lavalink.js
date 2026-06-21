@@ -14,6 +14,15 @@ const DEFAULT_PUBLIC_NODE = {
     requestSignalTimeoutMS: 30000
 }
 
+const FALLBACK_PUBLIC_NODE = {
+    id: 'nexcloud',
+    host: 'n3.nexcloud.in',
+    port: 2026,
+    authorization: 'nexcloud',
+    secure: false,
+    requestSignalTimeoutMS: 30000
+}
+
 const resolveNode = (client) => {
     const rawHost = process.env.LAVALINK_HOST || client.config.LAVALINK_HOST
     const password = process.env.LAVALINK_PASSWORD || client.config.LAVALINK_PASSWORD
@@ -320,8 +329,14 @@ module.exports = async (client) => {
     }
 
     client.lavalinkNodeOptions = node
+
+    const isDefaultNode = !process.env.LAVALINK_HOST && !client.config.LAVALINK_HOST
+    const nodes = isDefaultNode
+        ? [node, { ...FALLBACK_PUBLIC_NODE, retryAmount: 5, retryDelay: 10000 }]
+        : [node]
+
     client.lavalink = new LavalinkManager({
-        nodes: [node],
+        nodes,
         sendToShard: (guildId, payload) => {
             const guild = client.guilds.cache.get(guildId)
             if (guild?.shard) return guild.shard.send(payload)
