@@ -3,11 +3,11 @@ const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js')
 const URL_REGEX = /^https?:\/\//i
 const COMPONENTS_V2_FLAG = 1 << 15
 const DEFAULT_PUBLIC_NODE = {
-    id: 'nexcloud',
-    host: 'n3.nexcloud.in',
-    port: 2026,
-    authorization: 'nexcloud',
-    secure: false,
+    id: 'serenetia',
+    host: 'lavalinkv4.serenetia.com',
+    port: 443,
+    authorization: 'https://seretia.link/discord',
+    secure: true,
     requestSignalTimeoutMS: 30000,
     retryAmount: 5,
     retryDelay: 10000

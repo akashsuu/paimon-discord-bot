@@ -6,11 +6,11 @@ const truthy = (value) => ['1', 'true', 'yes', 'on'].includes(String(value || ''
 const AUTO_LEAVE_MS = 60 * 1000
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
 const DEFAULT_PUBLIC_NODE = {
-    id: 'nexcloud',
-    host: 'n3.nexcloud.in',
-    port: 2026,
-    authorization: 'nexcloud',
-    secure: false,
+    id: 'serenetia',
+    host: 'lavalinkv4.serenetia.com',
+    port: 443,
+    authorization: 'https://seretia.link/discord',
+    secure: true,
     requestSignalTimeoutMS: 30000
 }
 
